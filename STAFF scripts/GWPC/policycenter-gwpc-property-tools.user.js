@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GWPC Property Tools for PolicyCenter
 // @namespace    GPG_Scripts
-// @version      1.0.2
+// @version      1.0.3
 // @description  Add Reconstruction Calculator, Zillow, and Google Maps buttons to PolicyCenter/Guidewire
 // @match        https://policycenter.farmersinsurance.com/pc/PolicyCenter.do*
 // @match        https://policycenter-2.farmersinsurance.com/pc/PolicyCenter.do*
@@ -98,6 +98,12 @@
         baseUrl: 'https://gomezagency.net/zipcodes.html',
         addressSelectors: {
             existingPolicy: [
+                '.gw-RangeValue[data-gw-value^="PolicyLocation:"] .gw-link.gw-label',
+                '.gw-link.gw-label[data-gw-click*="HODwellingLocationInput"]',
+                '[data-gw-click*="HODwellingLocationInput"]',
+                '[id^="PolicyFileDwellingHOE"][id*="Address"] .gw-link.gw-label',
+                '[id^="PolicyFileDwellingHOE"][id*="Address"] .gw-value-readonly-wrapper',
+                '[id^="PolicyFileDwellingHOE"][id*="Location"] .gw-link.gw-label',
                 '#PolicyFileAccountFile_Summary-Summary_PolicyInfoDV-Address .gw-link.gw-label',
                 '#PolicyFileAccountFile_Summary-Summary_PolicyInfoDV-Address .gw-value-readonly-wrapper',
                 '[id*="Address"] .gw-link.gw-label',
@@ -134,11 +140,25 @@
         screenConfigs: [
             {
                 key: 'existingPolicy',
-                mountSelectors: ['#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-7'],
+                zipCodeFromAddressFirst: true,
+                mountSelectors: [
+                    '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-7',
+                    '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot_Input',
+                    '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot',
+                    '[id^="PolicyFileDwellingHOE"][id*="HODwellingConstructionDetailsHOEDV"][id*="ApproxSqFoot"]',
+                    '[id^="PolicyFileDwellingHOE"][id*="HODwellingConstructionDetailsHOEDV"]',
+                    '[id^="PolicyFileDwellingHOE"][id*="HODwellingSingleHOEPanelSet"][id*="HODwellingDetailsHOEDV"]',
+                    '[id^="PolicyFileDwellingHOE"][id*="PolicyFile_Homeowners_Dwelling_Screen"]'
+                ],
                 squareFootageSelectors: [
+                    '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot_Input .gw-value-readonly-wrapper',
                     '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot .gw-value-readonly-wrapper',
                     '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot .gw-value',
-                    '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot input'
+                    '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-HODwellingConstructionDetailsHOEDV-ApproxSqFoot input',
+                    '[id^="PolicyFileDwellingHOE"][id*="ApproxSqFoot"] .gw-value-readonly-wrapper',
+                    '[id^="PolicyFileDwellingHOE"][id*="ApproxSqFoot"] .gw-value',
+                    '[id^="PolicyFileDwellingHOE"][id*="ApproxSqFoot"] input[name*="ApproxSqFoot"]',
+                    '[id^="PolicyFileDwellingHOE"][id*="ApproxSqFoot"] input'
                 ],
                 zipCodeSelectors: [
                     '#PolicyFileAccountFile_Summary-Summary_PolicyInfoDV-PostalCode input',
