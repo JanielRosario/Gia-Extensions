@@ -106,6 +106,17 @@ New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 try {
   Copy-ExtensionRuntimeFiles -SourceDir $resolvedExtensionDir -DestinationDir $stagingDir
 
+  $stagingManifestPath = Join-Path $stagingDir "manifest.json"
+  $stagingManifest = Get-Content -LiteralPath $stagingManifestPath -Raw | ConvertFrom-Json
+  if ($stagingManifest.PSObject.Properties.Name -contains "update_url") {
+    $stagingManifest.update_url = $updateUrl
+  } else {
+    $stagingManifest | Add-Member -NotePropertyName "update_url" -NotePropertyValue $updateUrl
+  }
+  $stagingManifest |
+    ConvertTo-Json -Depth 20 |
+    Set-Content -LiteralPath $stagingManifestPath -Encoding UTF8
+
   $browser = Get-PackBrowserPath
   $browserProfileDir = Join-Path $tempRoot "browser-profile"
   New-Item -ItemType Directory -Path $browserProfileDir -Force | Out-Null

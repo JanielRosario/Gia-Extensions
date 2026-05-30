@@ -52,6 +52,47 @@ function Set-ForceInstallEntry {
   Write-Host "$BrowserName policy added at slot $nextIndex."
 }
 
+function Set-ExtensionSettingsPolicy {
+  param(
+    [string]$BrowserPolicyPath,
+    [string]$BrowserName
+  )
+
+  if (!(Test-Path -LiteralPath $BrowserPolicyPath)) {
+    New-Item -Path $BrowserPolicyPath -Force | Out-Null
+  }
+
+  $existingSettings = @{}
+  $existingValue = (Get-ItemProperty -LiteralPath $BrowserPolicyPath -Name "ExtensionSettings" -ErrorAction SilentlyContinue).ExtensionSettings
+
+  if (![string]::IsNullOrWhiteSpace($existingValue)) {
+    try {
+      $existingObject = $existingValue | ConvertFrom-Json
+      foreach ($property in $existingObject.PSObject.Properties) {
+        $existingSettings[$property.Name] = $property.Value
+      }
+    } catch {
+      Write-Warning "$BrowserName ExtensionSettings policy exists but is not valid JSON. Replacing it."
+    }
+  }
+
+  $existingSettings[$ExtensionId] = [ordered]@{
+    installation_mode = "force_installed"
+    update_url = $UpdateUrl
+    override_update_url = $true
+  }
+
+  $settingsJson = $existingSettings | ConvertTo-Json -Depth 20 -Compress
+  New-ItemProperty `
+    -LiteralPath $BrowserPolicyPath `
+    -Name "ExtensionSettings" `
+    -Value $settingsJson `
+    -PropertyType String `
+    -Force | Out-Null
+
+  Write-Host "$BrowserName ExtensionSettings policy updated."
+}
+
 if ($Scope -eq "Machine" -and !(Test-IsAdmin)) {
   throw "Machine-scope install requires running PowerShell as Administrator."
 }
@@ -73,11 +114,17 @@ if ($installChrome) {
   Set-ForceInstallEntry `
     -PolicyPath "$policyRoot\Google\Chrome\ExtensionInstallForcelist" `
     -BrowserName "Chrome"
+  Set-ExtensionSettingsPolicy `
+    -BrowserPolicyPath "$policyRoot\Google\Chrome" `
+    -BrowserName "Chrome"
 }
 
 if ($installEdge) {
   Set-ForceInstallEntry `
     -PolicyPath "$policyRoot\Microsoft\Edge\ExtensionInstallForcelist" `
+    -BrowserName "Edge"
+  Set-ExtensionSettingsPolicy `
+    -BrowserPolicyPath "$policyRoot\Microsoft\Edge" `
     -BrowserName "Edge"
 }
 

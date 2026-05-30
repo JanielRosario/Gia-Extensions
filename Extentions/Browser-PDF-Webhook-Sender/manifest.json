@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Browser PDF Webhook Sender",
   "description": "Finds original PDFs in the current browser tab and sends them to Quote-to-Email or a configured webhook.",
-  "version": "0.25.1",
+  "version": "0.25.2",
   "minimum_chrome_version": "109",
   "permissions": [
     "alarms",
