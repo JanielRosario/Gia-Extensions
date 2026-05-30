@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GWPC Property Tools for PolicyCenter
 // @namespace    GPG_Scripts
-// @version      1.0.4
+// @version      1.0.5
 // @description  Add Reconstruction Calculator, Zillow, and Google Maps buttons to PolicyCenter/Guidewire
 // @match        https://policycenter.farmersinsurance.com/pc/PolicyCenter.do*
 // @match        https://policycenter-2.farmersinsurance.com/pc/PolicyCenter.do*
@@ -57,9 +57,10 @@
 
     const normalizeAddress = (value) => value.replace(/\s+/g, ' ').trim();
 
-    const resolveMountElement = (mountSelector) => {
+    const resolveMountTarget = (mountSelector) => {
         if (typeof mountSelector === 'string') {
-            return document.querySelector(mountSelector);
+            const element = document.querySelector(mountSelector);
+            return element ? { element, placement: 'append' } : null;
         }
 
         const sourceElement = document.querySelector(mountSelector.selector);
@@ -67,15 +68,16 @@
             return null;
         }
 
-        return mountSelector.closest ? sourceElement.closest(mountSelector.closest) : sourceElement;
+        const element = mountSelector.closest ? sourceElement.closest(mountSelector.closest) : sourceElement;
+        return element ? { element, placement: mountSelector.placement || 'append' } : null;
     };
 
     const findMountTarget = (screenConfigs) => {
         for (const screenConfig of screenConfigs) {
             for (const mountSelector of screenConfig.mountSelectors) {
-                const element = resolveMountElement(mountSelector);
-                if (element) {
-                    return { screenConfig, element };
+                const target = resolveMountTarget(mountSelector);
+                if (target) {
+                    return { screenConfig, ...target };
                 }
             }
         }
@@ -157,6 +159,11 @@
                 mountSelectors: [
                     {
                         selector:
+                            '.gw-InputDividerWidget[id^="PolicyFileDwellingHOE"][id*="HODwellingConstructionDetailsHOEDV-1"]',
+                        placement: 'after'
+                    },
+                    {
+                        selector:
                             '#PolicyFileDwellingHOE-PolicyFile_Homeowners_Dwelling_Screen-PolicyFileDwellingConstructionPanelSet-HiddenWidgetsDV-0',
                         closest: '.gw-DetailViewWidget--body'
                     },
@@ -198,6 +205,16 @@
                 key: 'submission',
                 zipCodeFromAddressFirst: true,
                 mountSelectors: [
+                    {
+                        selector:
+                            '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-1',
+                        placement: 'after'
+                    },
+                    {
+                        selector:
+                            '.gw-InputDividerWidget[id^="SubmissionWizard"][id*="HODwellingConstructionDetailsHOEDV-1"]',
+                        placement: 'after'
+                    },
                     '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRsikUpdateDV-0',
                     '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRiskUpdateDV-0'
                 ],
@@ -222,6 +239,11 @@
                 key: 'policyChange',
                 zipCodeFromAddressFirst: true,
                 mountSelectors: [
+                    {
+                        selector:
+                            '.gw-InputDividerWidget[id^="PolicyChangeWizard"][id*="HODwellingConstructionDetailsHOEDV-1"]',
+                        placement: 'after'
+                    },
                     '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRsikUpdateDV-0',
                     '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRiskUpdateDV-0'
                 ],
@@ -486,6 +508,10 @@
             return false;
         }
 
+        if (target.placement === 'after') {
+            return root.parentElement === target.element.parentElement && root.previousElementSibling === target.element;
+        }
+
         return target.element.contains(root);
     };
 
@@ -526,12 +552,21 @@
             return null;
         }
 
-        return Array.from(target.element.children).find(
+        return Array.from(document.querySelectorAll(`[${RECONSTRUCTION.rootAttr}="true"]`)).find(
             (child) =>
                 child.getAttribute &&
                 child.getAttribute(RECONSTRUCTION.rootAttr) === 'true' &&
                 child.getAttribute(RECONSTRUCTION.screenAttr) === target.screenConfig.key
         ) || null;
+    };
+
+    const mountReconstructionRoot = (root, target) => {
+        if (target.placement === 'after' && target.element.parentElement) {
+            target.element.insertAdjacentElement('afterend', root);
+            return;
+        }
+
+        target.element.appendChild(root);
     };
 
     const refreshReconstructionButtonState = (button, screenConfig) => {
@@ -565,9 +600,9 @@
 
             const button = createReconstructionButton(target.screenConfig);
             root.appendChild(button);
-            target.element.appendChild(root);
         }
 
+        mountReconstructionRoot(root, target);
         refreshReconstructionButtonState(root.querySelector(`.${RECONSTRUCTION.buttonClass}`), target.screenConfig);
     };
 
