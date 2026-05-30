@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GWPC Property Tools for PolicyCenter
 // @namespace    GPG_Scripts
-// @version      1.0.0
+// @version      1.0.1
 // @description  Add Reconstruction Calculator, Zillow, and Google Maps buttons to PolicyCenter/Guidewire
 // @match        https://policycenter.farmersinsurance.com/pc/PolicyCenter.do*
 // @match        https://policycenter-2.farmersinsurance.com/pc/PolicyCenter.do*
@@ -16,6 +16,15 @@
     'use strict';
 
     const SYNC_DELAY_MS = 75;
+
+    const VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON = {
+        titleSelector: '.gw-TitleBar--title',
+        titleText: 'Value Insurance Package',
+        buttonSelector:
+            '#SubmissionWizard-JobWizardToolsMenuWizardStepSet-MLI_Illustration_ExtScreen-actionableButtonDV-emailPkId',
+        hiddenAttr: 'data-gpg-hidden-value-insurance-email',
+        originalDisplayAttr: 'data-gpg-original-display'
+    };
 
     const uniqueElements = (selectors, scope) => {
         const root = scope || document;
@@ -654,6 +663,37 @@
         refreshPropertyLinkButtonStates(root, target.screenConfig, target.element);
     };
 
+    const isValueInsurancePackageScreen = () =>
+        Array.from(document.querySelectorAll(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.titleSelector)).some(
+            (element) => normalizeAddress(readElementValue(element)) === VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.titleText
+        );
+
+    const syncValueInsurancePackageEmailButton = () => {
+        const button = document.querySelector(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.buttonSelector);
+        if (!button) {
+            return;
+        }
+
+        if (isValueInsurancePackageScreen()) {
+            if (!button.hasAttribute(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.hiddenAttr)) {
+                button.setAttribute(
+                    VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.originalDisplayAttr,
+                    button.style.display || ''
+                );
+                button.setAttribute(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.hiddenAttr, 'true');
+            }
+
+            button.style.display = 'none';
+            return;
+        }
+
+        if (button.hasAttribute(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.hiddenAttr)) {
+            button.style.display = button.getAttribute(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.originalDisplayAttr) || '';
+            button.removeAttribute(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.originalDisplayAttr);
+            button.removeAttribute(VALUE_INSURANCE_PACKAGE_EMAIL_BUTTON.hiddenAttr);
+        }
+    };
+
     let syncScheduled = false;
 
     function scheduleSync() {
@@ -667,6 +707,7 @@
             syncScheduled = false;
             ensureReconstructionButton();
             ensurePropertyLinkButtons();
+            syncValueInsurancePackageEmailButton();
         }, SYNC_DELAY_MS);
     }
 
