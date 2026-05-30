@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GWPC Property Tools for PolicyCenter
 // @namespace    GPG_Scripts
-// @version      1.0.1
+// @version      1.0.2
 // @description  Add Reconstruction Calculator, Zillow, and Google Maps buttons to PolicyCenter/Guidewire
 // @match        https://policycenter.farmersinsurance.com/pc/PolicyCenter.do*
 // @match        https://policycenter-2.farmersinsurance.com/pc/PolicyCenter.do*
@@ -104,12 +104,18 @@
                 '[id*="Address"] .gw-value-readonly-wrapper'
             ],
             submission: [
+                '.gw-RangeValue[data-gw-value^="PolicyLocation:"] .gw-link.gw-label',
+                '.gw-link.gw-label[data-gw-click*="HODwellingLocationInput"]',
+                '[data-gw-click*="HODwellingLocationInput"]',
                 '[id^="SubmissionWizard"][id*="Address"] .gw-link.gw-label',
                 '[id^="SubmissionWizard"][id*="Address"] .gw-value-readonly-wrapper',
                 '[id^="SubmissionWizard"][id*="Address"] input',
                 '[id^="SubmissionWizard"][id*="Location"] .gw-link.gw-label'
             ],
             policyChange: [
+                '.gw-RangeValue[data-gw-value^="PolicyLocation:"] .gw-link.gw-label',
+                '.gw-link.gw-label[data-gw-click*="HODwellingLocationInput"]',
+                '[data-gw-click*="HODwellingLocationInput"]',
                 '[id^="PolicyChangeWizard"][id*="Address"] .gw-link.gw-label',
                 '[id^="PolicyChangeWizard"][id*="Address"] .gw-value-readonly-wrapper',
                 '[id^="PolicyChangeWizard"][id*="Address"] input',
@@ -119,7 +125,10 @@
                 '[id*="Address"] .gw-link.gw-label',
                 '[id*="Address"] .gw-value-readonly-wrapper',
                 '[id*="Address"] input',
-                '[id*="Location"] .gw-link.gw-label'
+                '[id*="Location"] .gw-link.gw-label',
+                '.gw-RangeValue[data-gw-value^="PolicyLocation:"] .gw-link.gw-label',
+                '.gw-link.gw-label[data-gw-click*="HODwellingLocationInput"]',
+                '[data-gw-click*="HODwellingLocationInput"]'
             ]
         },
         screenConfigs: [
@@ -139,13 +148,19 @@
             },
             {
                 key: 'submission',
+                zipCodeFromAddressFirst: true,
                 mountSelectors: [
                     '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRsikUpdateDV-0',
                     '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRiskUpdateDV-0'
                 ],
                 squareFootageSelectors: [
+                    '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot_Input .gw-value-readonly-wrapper',
+                    '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot .gw-value-readonly-wrapper',
+                    '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot .gw-value',
                     '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot input[name*="ApproxSqFoot"]',
                     '#SubmissionWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot input',
+                    '[id^="SubmissionWizard"][id*="ApproxSqFoot"] .gw-value-readonly-wrapper',
+                    '[id^="SubmissionWizard"][id*="ApproxSqFoot"] .gw-value',
                     '[id^="SubmissionWizard"][id*="ApproxSqFoot"] input[name*="ApproxSqFoot"]',
                     '[id^="SubmissionWizard"][id*="ApproxSqFoot"] input'
                 ],
@@ -157,13 +172,19 @@
             },
             {
                 key: 'policyChange',
+                zipCodeFromAddressFirst: true,
                 mountSelectors: [
                     '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRsikUpdateDV-0',
                     '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-VRiskUpdateDV-0'
                 ],
                 squareFootageSelectors: [
+                    '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot_Input .gw-value-readonly-wrapper',
+                    '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot .gw-value-readonly-wrapper',
+                    '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot .gw-value',
                     '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot input[name*="ApproxSqFoot"]',
                     '#PolicyChangeWizard-LOBWizardStepGroup-LineWizardStepSet-HODwellingHOEScreen-HODwellingConstructionSingleHOEPanelSet-HODwellingConstructionDetailsHOEDV-ApproxSqFoot input',
+                    '[id^="PolicyChangeWizard"][id*="ApproxSqFoot"] .gw-value-readonly-wrapper',
+                    '[id^="PolicyChangeWizard"][id*="ApproxSqFoot"] .gw-value',
                     '[id^="PolicyChangeWizard"][id*="ApproxSqFoot"] input[name*="ApproxSqFoot"]',
                     '[id^="PolicyChangeWizard"][id*="ApproxSqFoot"] input'
                 ],
@@ -362,19 +383,7 @@
         return texts;
     };
 
-    const findZipCode = (screenConfig) => {
-        if (!screenConfig) {
-            return '';
-        }
-
-        const zipFieldCandidates = uniqueElements(screenConfig.zipCodeSelectors || []);
-        for (const element of zipFieldCandidates) {
-            const zipCode = normalizeZipCode(readElementValue(element));
-            if (zipCode) {
-                return zipCode;
-            }
-        }
-
+    const findZipCodeFromAddress = (screenConfig) => {
         const addressCandidate = findReconstructionAddress(screenConfig.key);
         const addressTexts = collectAddressTexts(addressCandidate);
 
@@ -386,6 +395,29 @@
         }
 
         return '';
+    };
+
+    const findZipCode = (screenConfig) => {
+        if (!screenConfig) {
+            return '';
+        }
+
+        if (screenConfig.zipCodeFromAddressFirst) {
+            const addressZipCode = findZipCodeFromAddress(screenConfig);
+            if (addressZipCode) {
+                return addressZipCode;
+            }
+        }
+
+        const zipFieldCandidates = uniqueElements(screenConfig.zipCodeSelectors || []);
+        for (const element of zipFieldCandidates) {
+            const zipCode = normalizeZipCode(readElementValue(element));
+            if (zipCode) {
+                return zipCode;
+            }
+        }
+
+        return findZipCodeFromAddress(screenConfig);
     };
 
     const buildReconstructionUrl = (screenConfig) => {
