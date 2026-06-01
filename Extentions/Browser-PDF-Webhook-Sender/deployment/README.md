@@ -33,7 +33,7 @@ Do not commit the `.pem` file. It controls the extension ID and future updates.
 The public update URL will be:
 
 ```text
-https://JanielRosario.github.io/GIA-TamperMonkey/Extentions/Browser-PDF-Webhook-Sender/update.xml
+https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Sender/update.xml
 ```
 
 ## Remote Install
@@ -41,13 +41,13 @@ https://JanielRosario.github.io/GIA-TamperMonkey/Extentions/Browser-PDF-Webhook-
 Run this remotely as Administrator on each Windows PC:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "irm 'https://JanielRosario.github.io/GIA-TamperMonkey/Extentions/Browser-PDF-Webhook-Sender/install-managed-extension.ps1' | iex"
+powershell -ExecutionPolicy Bypass -Command "irm 'https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Sender/install-managed-extension.ps1' | iex"
 ```
 
 Or download and run this batch file as Administrator:
 
 ```text
-https://JanielRosario.github.io/GIA-TamperMonkey/Extentions/Browser-PDF-Webhook-Sender/install-managed-extension.bat
+https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Sender/install-managed-extension.bat
 ```
 
 The installer writes Chrome and Edge force-install policy entries. Restart Chrome/Edge, or open `chrome://policy` / `edge://policy` and reload policies.
