@@ -321,7 +321,7 @@
         <button type="button" class="secondary" id="loadTokenFile">Load token file</button>
       </div>
       <input class="token-file" type="file" id="tokenFileInput" accept=".txt,text/plain">
-      <p class="hint">Token needs Contents: Read and write for JanielRosario/Gia-Extensions. The remember option uses this browser's password manager; the file option reads a local .txt token file when browser permission allows it.</p>
+      <p class="hint">Token needs Contents: Read and write for JanielRosario/Gia-Extensions. The remember option uses this browser's password manager; the file option can read a local .txt file with the token on the first line and an optional commit message on the second line.</p>
     </section>
 
     <section class="grid" id="scripts"></section>
@@ -537,12 +537,35 @@
       });
     }
 
+    function parseTokenFile(text) {
+      const content = String(text || '').trim();
+      if (!content) {
+        throw new Error('Token file is empty.');
+      }
+      if (content.startsWith('{')) {
+        const data = JSON.parse(content);
+        return {
+          token: String(data.token || data.githubToken || '').trim(),
+          commitMessage: String(data.commitMessage || '').trim()
+        };
+      }
+      const lines = content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      return {
+        token: lines[0] || '',
+        commitMessage: lines.slice(1).join(' ')
+      };
+    }
+
     async function readTokenFromFile(file) {
-      const token = (await file.text()).trim();
+      const { token, commitMessage } = parseTokenFile(await file.text());
       if (!token) {
         throw new Error('Token file is empty.');
       }
       setTokenValue(token);
+      if (commitMessage) {
+        commitMessageInput.value = commitMessage;
+        saveCommitMessageField();
+      }
       await rememberTokenInPasswordManager(false);
       return token;
     }
