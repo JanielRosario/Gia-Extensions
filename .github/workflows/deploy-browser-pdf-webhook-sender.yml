@@ -67,7 +67,7 @@ jobs:
           $source = Join-Path $PWD "Tampermonkey Installers"
           $destination = Join-Path $PWD "dist-pages/Tampermonkey Installers"
           New-Item -ItemType Directory -Path $destination -Force | Out-Null
-          Copy-Item -LiteralPath "$source\*" -Destination $destination -Recurse -Force
+          Copy-Item -Path (Join-Path $source "*") -Destination $destination -Recurse -Force
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
