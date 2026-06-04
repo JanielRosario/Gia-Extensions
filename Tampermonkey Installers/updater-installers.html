@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tampermonkey Installers</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #5d6b82;
+      --line: #d8e0eb;
+      --blue: #1f6feb;
+      --blue-dark: #174ea6;
+      --green: #16794c;
+      --shadow: 0 10px 30px rgba(23, 32, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 28px 20px;
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.55rem, 2.5vw, 2.25rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 10px 0 0;
+      max-width: 820px;
+      color: #cbd5e1;
+      font-size: 0.98rem;
+    }
+
+    main {
+      padding: 22px 0 40px;
+    }
+
+    .toolbar,
+    .position-panel,
+    .script {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 14px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button,
+    .button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    .button:hover {
+      background: var(--blue-dark);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .secondary {
+      background: #fff;
+      border-color: var(--line);
+      color: var(--ink);
+    }
+
+    .secondary:hover {
+      background: #eef3f9;
+    }
+
+    .install {
+      background: var(--green);
+    }
+
+    .install:hover {
+      background: #10613c;
+    }
+
+    .position-panel {
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .position-title {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 750;
+      margin: 0 0 10px;
+      text-transform: uppercase;
+    }
+
+    .position-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .position-button {
+      background: #fff;
+      border-color: var(--line);
+      color: var(--ink);
+      min-height: 46px;
+    }
+
+    .position-button.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 14px;
+    }
+
+    .script {
+      display: flex;
+      flex-direction: column;
+      min-height: 274px;
+      padding: 16px;
+    }
+
+    .script h2 {
+      margin: 0 0 8px;
+      font-size: 1.04rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .description {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin: 0 0 12px;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 10px;
+      margin: 0 0 14px;
+      font-size: 0.86rem;
+    }
+
+    dt {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    dd {
+      margin: 0;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    code {
+      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.86em;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+      flex-wrap: wrap;
+    }
+
+    .details {
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      display: none;
+      font-size: 0.9rem;
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+
+    .details.open {
+      display: block;
+    }
+
+    .empty,
+    .error {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      color: var(--muted);
+    }
+
+    .error {
+      border-color: #f2b8b5;
+      color: #8a1c12;
+    }
+
+    @media (max-width: 700px) {
+      .position-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      button,
+      .button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Tampermonkey Installers</h1>
+      <p class="subhead">Choose your position and install the approved updater scripts for your workstation.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="toolbar">
+      <div class="status" id="status">Loading installer config...</div>
+      <div class="actions">
+        <button type="button" class="secondary" id="refresh">Refresh</button>
+        <button type="button" id="openAll" disabled>Open shown installers</button>
+      </div>
+    </div>
+
+    <section class="position-panel">
+      <p class="position-title">Select position</p>
+      <div class="position-buttons" id="positionButtons"></div>
+    </section>
+
+    <section class="grid" id="scripts" aria-live="polite"></section>
+  </main>
+
+  <script>
+    const OWNER = 'ugomez809';
+    const REPO = 'GIA-TamperMonkey';
+    const BRANCH = 'main';
+    const CONFIG_URL = './Installer/installer-config.json';
+    const RAW_BASE_URL = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
+    const POSITION_STORAGE_KEY = 'tampermonkeyInstallerPosition';
+
+    const state = {
+      config: null,
+      position: '',
+      scripts: [],
+      shownScripts: []
+    };
+
+    const scriptsEl = document.getElementById('scripts');
+    const statusEl = document.getElementById('status');
+    const refreshButton = document.getElementById('refresh');
+    const openAllButton = document.getElementById('openAll');
+    const positionButtons = document.getElementById('positionButtons');
+
+    function encodePath(path) {
+      return path.split('/').map(encodeURIComponent).join('/');
+    }
+
+    function rawUrl(path) {
+      return `${RAW_BASE_URL}${encodePath(path)}`;
+    }
+
+    function clean(value) {
+      return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function readMeta(source, key) {
+      const pattern = new RegExp(`^//\\s*@${key}\\s+(.+)$`, 'mi');
+      const match = source.match(pattern);
+      return match ? clean(match[1]) : '';
+    }
+
+    function readMatches(source) {
+      return Array.from(source.matchAll(/^\/\/\s*@match\s+(.+)$/gmi))
+        .map((match) => clean(match[1]))
+        .filter(Boolean);
+    }
+
+    function readConst(source, name) {
+      const pattern = new RegExp(`const\\s+${name}\\s*=\\s*['"]([^'"]+)['"]`);
+      const match = source.match(pattern);
+      return match ? clean(match[1]) : '';
+    }
+
+    async function fetchText(url) {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`${url} returned ${response.status}`);
+      }
+      return response.text();
+    }
+
+    function targetPathFromUpdater(path, source) {
+      const targetFile = readConst(source, 'TARGET_FILE');
+      if (!targetFile) return '';
+      const folder = path.split('/').slice(0, -1).join('/');
+      return `${folder}/${targetFile}`;
+    }
+
+    async function loadScript(configScript) {
+      const updaterSource = await fetchText(`${rawUrl(configScript.path)}?installer=${Date.now()}`);
+      const targetPath = targetPathFromUpdater(configScript.path, updaterSource);
+      let scriptVersion = 'unknown';
+      let scriptName = '';
+      let scriptDescription = '';
+
+      if (targetPath) {
+        const targetSource = await fetchText(`${rawUrl(targetPath)}?script=${Date.now()}`);
+        scriptVersion = readMeta(targetSource, 'version') || 'unknown';
+        scriptName = readMeta(targetSource, 'name');
+        scriptDescription = readMeta(targetSource, 'description');
+      }
+
+      const updaterName = readMeta(updaterSource, 'name') || configScript.path.split('/').pop();
+      const displayName = scriptName || updaterName.replace(/\s+Updater$/i, '');
+
+      return {
+        path: configScript.path,
+        installUrl: readMeta(updaterSource, 'downloadURL') || readMeta(updaterSource, 'updateURL') || rawUrl(configScript.path),
+        name: displayName,
+        updaterName,
+        updaterVersion: readMeta(updaterSource, 'version') || 'unknown',
+        scriptVersion,
+        description: configScript.summary || scriptDescription || readMeta(updaterSource, 'description') || 'Tampermonkey updater script.',
+        details: configScript.details || scriptDescription || readMeta(updaterSource, 'description') || '',
+        matches: readMatches(updaterSource),
+        targetPath,
+        positions: configScript.positions || []
+      };
+    }
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('error', isError);
+    }
+
+    function renderEmpty(message) {
+      scriptsEl.innerHTML = '';
+      const node = document.createElement('div');
+      node.className = 'empty';
+      node.textContent = message;
+      scriptsEl.appendChild(node);
+    }
+
+    function renderError(message) {
+      scriptsEl.innerHTML = '';
+      const node = document.createElement('div');
+      node.className = 'error';
+      node.textContent = message;
+      scriptsEl.appendChild(node);
+    }
+
+    function renderPositionButtons() {
+      positionButtons.innerHTML = '';
+      (state.config.positions || []).forEach((position) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'position-button';
+        button.dataset.position = position;
+        button.textContent = position;
+        button.classList.toggle('active', state.position === position);
+        positionButtons.appendChild(button);
+      });
+    }
+
+    function filterScripts() {
+      if (!state.position) return [];
+      return state.scripts.filter((script) => script.positions.includes(state.position));
+    }
+
+    function renderScripts() {
+      state.shownScripts = filterScripts();
+      openAllButton.disabled = state.shownScripts.length === 0;
+      renderPositionButtons();
+
+      if (!state.position) {
+        renderEmpty('Choose your position to show installers.');
+        setStatus(`Loaded ${state.scripts.length} configured updaters.`);
+        return;
+      }
+
+      if (!state.shownScripts.length) {
+        renderEmpty('No installers are assigned to this position.');
+        setStatus(`Showing 0 installers for ${state.position}.`);
+        return;
+      }
+
+      scriptsEl.innerHTML = '';
+      state.shownScripts.forEach((script, index) => {
+        const article = document.createElement('article');
+        article.className = 'script';
+        article.innerHTML = `
+          <h2>${script.name}</h2>
+          <p class="description">${script.description}</p>
+          <dl>
+            <dt>Updater version</dt>
+            <dd>${script.updaterVersion}</dd>
+            <dt>Script version</dt>
+            <dd>${script.scriptVersion}</dd>
+            <dt>Updater path</dt>
+            <dd><code>${script.path}</code></dd>
+            <dt>Script path</dt>
+            <dd><code>${script.targetPath || 'Not found'}</code></dd>
+            <dt>Runs on</dt>
+            <dd>${script.matches.length ? script.matches.join(', ') : 'Not specified'}</dd>
+          </dl>
+          <div class="card-actions">
+            <a class="button install" href="${script.installUrl}" target="_blank" rel="noopener">Install</a>
+            <button type="button" class="secondary" data-details="${index}">Details</button>
+          </div>
+          <div class="details" id="details-${index}">${script.details || script.description}</div>
+        `;
+        scriptsEl.appendChild(article);
+      });
+      setStatus(`Showing ${state.shownScripts.length} installers for ${state.position}.`);
+    }
+
+    async function loadInstallers() {
+      refreshButton.disabled = true;
+      openAllButton.disabled = true;
+      setStatus('Loading installer config...');
+
+      try {
+        const configResponse = await fetch(`${CONFIG_URL}?config=${Date.now()}`, { cache: 'no-store' });
+        if (!configResponse.ok) throw new Error(`Installer config returned ${configResponse.status}`);
+        state.config = await configResponse.json();
+        const savedPosition = localStorage.getItem(POSITION_STORAGE_KEY) || '';
+        state.position = (state.config.positions || []).includes(savedPosition) ? savedPosition : '';
+        renderPositionButtons();
+        setStatus('Loading script versions...');
+        state.scripts = await Promise.all((state.config.scripts || []).map(loadScript));
+        state.scripts.sort((a, b) => a.name.localeCompare(b.name));
+        renderScripts();
+      } catch (error) {
+        renderError(`Could not load installers. ${error.message || error}`);
+        setStatus('Unable to load installers.', true);
+      } finally {
+        refreshButton.disabled = false;
+      }
+    }
+
+    positionButtons.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-position]');
+      if (!button) return;
+      state.position = button.dataset.position;
+      localStorage.setItem(POSITION_STORAGE_KEY, state.position);
+      renderScripts();
+    });
+
+    scriptsEl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-details]');
+      if (!button) return;
+      const panel = document.getElementById(`details-${button.dataset.details}`);
+      if (!panel) return;
+      panel.classList.toggle('open');
+    });
+
+    refreshButton.addEventListener('click', loadInstallers);
+    openAllButton.addEventListener('click', () => {
+      state.shownScripts.forEach((script, index) => {
+        window.setTimeout(() => window.open(script.installUrl, '_blank', 'noopener'), index * 350);
+      });
+    });
+
+    loadInstallers();
+  </script>
+</body>
+</html>

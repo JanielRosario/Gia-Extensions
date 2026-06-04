@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Installer Manager</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #152033;
+      --muted: #5f6f86;
+      --line: #d7e0ec;
+      --blue: #1769e0;
+      --blue-dark: #1152b3;
+      --green: #147a4b;
+      --red: #b42318;
+      --shadow: 0 8px 22px rgba(21, 32, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 24px 20px;
+    }
+
+    .wrap {
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.2vw, 2.1rem);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 8px 0 0;
+      color: #cbd5e1;
+      max-width: 850px;
+      font-size: 0.95rem;
+    }
+
+    main {
+      padding: 20px 0 42px;
+    }
+
+    .toolbar,
+    .panel,
+    .script {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button,
+    .button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    .button:hover {
+      background: var(--blue-dark);
+    }
+
+    .secondary {
+      background: #fff;
+      border-color: var(--line);
+      color: var(--ink);
+    }
+
+    .secondary:hover {
+      background: #eef3f9;
+    }
+
+    .success {
+      background: var(--green);
+    }
+
+    .success:hover {
+      background: #0f623d;
+    }
+
+    .panel {
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .panel h2,
+    .script h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .position-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      font: inherit;
+      padding: 9px 10px;
+      background: #fff;
+    }
+
+    .position-input {
+      max-width: 280px;
+    }
+
+    .token-grid {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) minmax(220px, 1fr);
+      gap: 12px;
+      align-items: end;
+    }
+
+    .save-actions {
+      margin-top: 12px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin: 10px 0 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 14px;
+    }
+
+    .script {
+      padding: 14px;
+    }
+
+    .path {
+      color: var(--muted);
+      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      overflow-wrap: anywhere;
+      margin-bottom: 12px;
+    }
+
+    .check-groups {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .check-group {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfdff;
+    }
+
+    .check-title {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 750;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.9rem;
+      margin: 6px 0;
+    }
+
+    .field {
+      margin-top: 10px;
+    }
+
+    .field span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    .json-output {
+      min-height: 220px;
+      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      margin-top: 10px;
+    }
+
+    .error {
+      color: var(--red);
+    }
+
+    @media (max-width: 760px) {
+      .token-grid,
+      .check-groups {
+        grid-template-columns: 1fr;
+      }
+
+      button,
+      .button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Installer Manager</h1>
+      <p class="subhead">Position and details configuration for the employee installer page.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="toolbar">
+      <div class="status" id="status">Loading config...</div>
+      <div class="actions">
+        <a class="button secondary" href="../updater-installers.html">Employee page</a>
+        <button type="button" class="secondary" id="refresh">Refresh</button>
+        <button type="button" class="success" id="download">Download JSON</button>
+        <button type="button" id="copy">Copy JSON</button>
+      </div>
+    </div>
+
+    <section class="panel">
+      <h2>Positions</h2>
+      <p class="status">Available employee positions: PRODUCER, CSR, SDR.</p>
+    </section>
+
+    <section class="panel">
+      <h2>GitHub Save</h2>
+      <div class="token-grid">
+        <label class="field">
+          <span>GitHub token</span>
+          <input type="password" id="githubToken" autocomplete="off" spellcheck="false" placeholder="Fine-grained token">
+        </label>
+        <label class="field">
+          <span>Commit message</span>
+          <input type="text" id="commitMessage" value="Update installer positions">
+        </label>
+      </div>
+      <div class="actions save-actions">
+        <button type="button" class="success" id="saveGitHub">Save to GitHub</button>
+      </div>
+      <p class="hint">Token needs Contents: Read and write for JanielRosario/Gia-Extensions.</p>
+    </section>
+
+    <section class="grid" id="scripts"></section>
+
+    <section class="panel">
+      <h2>Generated Config</h2>
+      <textarea class="json-output" id="jsonOutput" spellcheck="false"></textarea>
+    </section>
+  </main>
+
+  <script>
+    const OWNER = 'JanielRosario';
+    const REPO = 'Gia-Extensions';
+    const BRANCH = 'main';
+    const CONFIG_PATH = 'Tampermonkey Installers/Installer/installer-config.json';
+    const CONFIG_URL = './installer-config.json';
+    const GITHUB_CONTENTS_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeRepoPath(CONFIG_PATH)}`;
+    const REQUIRED_POSITIONS = ['PRODUCER', 'CSR', 'SDR'];
+
+    const state = {
+      config: null
+    };
+
+    const scriptsEl = document.getElementById('scripts');
+    const statusEl = document.getElementById('status');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const refreshButton = document.getElementById('refresh');
+    const downloadButton = document.getElementById('download');
+    const copyButton = document.getElementById('copy');
+    const githubTokenInput = document.getElementById('githubToken');
+    const commitMessageInput = document.getElementById('commitMessage');
+    const saveGitHubButton = document.getElementById('saveGitHub');
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('error', isError);
+    }
+
+    function normalizePosition(value) {
+      return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function encodeRepoPath(path) {
+      return path.split('/').map(encodeURIComponent).join('/');
+    }
+
+    function cloneConfig(config) {
+      return JSON.parse(JSON.stringify(config));
+    }
+
+    function getConfigForExport() {
+      const config = cloneConfig(state.config);
+      config.updatedAt = new Date().toISOString().slice(0, 10);
+      return config;
+    }
+
+    function syncOutput() {
+      jsonOutput.value = JSON.stringify(getConfigForExport(), null, 2);
+    }
+
+    function validateConfig(config) {
+      const errors = [];
+      if (!config || typeof config !== 'object') {
+        return ['Config must be a JSON object.'];
+      }
+      if (JSON.stringify(config.positions || []) !== JSON.stringify(REQUIRED_POSITIONS)) {
+        errors.push('Positions must be PRODUCER, CSR, SDR.');
+      }
+      if ('tags' in config) {
+        errors.push('Tags are not part of the installer config.');
+      }
+      if (!Array.isArray(config.scripts)) {
+        errors.push('Scripts must be an array.');
+        return errors;
+      }
+      config.scripts.forEach((script) => {
+        if (!script.path || !script.path.endsWith('-updater.user.js')) {
+          errors.push(`Only updater scripts can be listed: ${script.path || '(missing path)'}`);
+        }
+        if (!Array.isArray(script.positions)) {
+          errors.push(`Positions must be an array: ${script.path}`);
+        } else {
+          script.positions.forEach((position) => {
+            if (!REQUIRED_POSITIONS.includes(position)) {
+              errors.push(`Unknown position ${position}: ${script.path}`);
+            }
+          });
+        }
+        if ('tags' in script) {
+          errors.push(`Script tags are not allowed: ${script.path}`);
+        }
+      });
+      return errors;
+    }
+
+    function readOutputConfig() {
+      let config;
+      try {
+        config = JSON.parse(jsonOutput.value);
+      } catch (error) {
+        throw new Error(`Generated config is not valid JSON: ${error.message}`);
+      }
+      const errors = validateConfig(config);
+      if (errors.length) {
+        throw new Error(errors.join(' '));
+      }
+      return {
+        config,
+        json: `${JSON.stringify(config, null, 2)}\n`
+      };
+    }
+
+    function toBase64Utf8(value) {
+      const bytes = new TextEncoder().encode(value);
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary);
+    }
+
+    async function githubRequest(url, token, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(options.headers || {})
+        }
+      });
+      const body = await response.text();
+      let data = null;
+      try {
+        data = body ? JSON.parse(body) : null;
+      } catch {
+        data = body;
+      }
+      if (!response.ok) {
+        const message = data && data.message ? data.message : `GitHub returned ${response.status}`;
+        throw new Error(message);
+      }
+      return data;
+    }
+
+    function updateScript(path, patch) {
+      const script = state.config.scripts.find((item) => item.path === path);
+      if (!script) return;
+      Object.assign(script, patch);
+      syncOutput();
+    }
+
+    function toggleListValue(values, value, checked) {
+      const next = new Set(values || []);
+      if (checked) next.add(value);
+      else next.delete(value);
+      return Array.from(next);
+    }
+
+    function renderCheckboxes(script, values, type) {
+      const options = state.config.positions;
+      return options.map((option) => {
+        const checked = (values || []).includes(option) ? 'checked' : '';
+        return `
+          <label>
+            <input type="checkbox" data-path="${script.path}" data-type="${type}" data-value="${option}" ${checked}>
+            <span>${option}</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    function renderScripts() {
+      scriptsEl.innerHTML = state.config.scripts.map((script) => `
+        <article class="script">
+          <h2>${script.summary || script.path.split('/').pop()}</h2>
+          <div class="path">${script.path}</div>
+          <div class="check-groups">
+            <div class="check-group">
+              <div class="check-title">Positions</div>
+              ${renderCheckboxes(script, script.positions, 'positions')}
+            </div>
+          </div>
+          <label class="field">
+            <span>Summary</span>
+            <input type="text" data-path="${script.path}" data-field="summary" value="${(script.summary || '').replace(/"/g, '&quot;')}">
+          </label>
+          <label class="field">
+            <span>Details</span>
+            <textarea data-path="${script.path}" data-field="details">${script.details || ''}</textarea>
+          </label>
+        </article>
+      `).join('');
+      syncOutput();
+    }
+
+    async function loadConfig() {
+      setStatus('Loading config...');
+      const response = await fetch(`${CONFIG_URL}?manager=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Config returned ${response.status}`);
+      const config = await response.json();
+      config.positions = (config.positions || []).map(normalizePosition).filter(Boolean);
+      config.scripts = config.scripts || [];
+      state.config = config;
+      renderScripts();
+      setStatus(`Loaded ${config.scripts.length} scripts.`);
+    }
+
+    function downloadConfig() {
+      const blob = new Blob([jsonOutput.value + '\n'], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'installer-config.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copyConfig() {
+      jsonOutput.select();
+      try {
+        await navigator.clipboard.writeText(jsonOutput.value);
+        setStatus('Config copied.');
+      } catch {
+        document.execCommand('copy');
+        setStatus('Config selected.');
+      }
+    }
+
+    async function saveConfigToGitHub() {
+      const token = githubTokenInput.value.trim();
+      if (!token) {
+        setStatus('Enter a GitHub token before saving.', true);
+        return;
+      }
+
+      try {
+        saveGitHubButton.disabled = true;
+        const { config, json } = readOutputConfig();
+        setStatus('Reading current GitHub config...');
+        const currentFile = await githubRequest(`${GITHUB_CONTENTS_URL}?ref=${encodeURIComponent(BRANCH)}`, token);
+        if (!currentFile || !currentFile.sha) {
+          throw new Error('GitHub did not return a file SHA.');
+        }
+
+        setStatus('Saving config to GitHub...');
+        const result = await githubRequest(GITHUB_CONTENTS_URL, token, {
+          method: 'PUT',
+          body: JSON.stringify({
+            message: commitMessageInput.value.trim() || 'Update installer positions',
+            content: toBase64Utf8(json),
+            sha: currentFile.sha,
+            branch: BRANCH
+          })
+        });
+
+        state.config = config;
+        jsonOutput.value = json;
+        const shortSha = result && result.commit && result.commit.sha ? result.commit.sha.slice(0, 7) : 'saved';
+        setStatus(`Saved to GitHub (${shortSha}). GitHub Pages may take a minute to refresh.`);
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      } finally {
+        saveGitHubButton.disabled = false;
+      }
+    }
+
+    scriptsEl.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!target.matches('input[type="checkbox"]')) return;
+      const script = state.config.scripts.find((item) => item.path === target.dataset.path);
+      if (!script) return;
+      const type = target.dataset.type;
+      updateScript(script.path, {
+        [type]: toggleListValue(script[type], target.dataset.value, target.checked)
+      });
+    });
+
+    scriptsEl.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!target.dataset.field) return;
+      updateScript(target.dataset.path, {
+        [target.dataset.field]: target.value
+      });
+    });
+
+    refreshButton.addEventListener('click', () => loadConfig().catch((error) => setStatus(error.message || String(error), true)));
+    downloadButton.addEventListener('click', downloadConfig);
+    copyButton.addEventListener('click', copyConfig);
+    saveGitHubButton.addEventListener('click', saveConfigToGitHub);
+
+    loadConfig().catch((error) => setStatus(error.message || String(error), true));
+  </script>
+</body>
+</html>
