@@ -17,8 +17,7 @@
       "path": "AgencyZoom/Location Box Cleanup/agencyzoom-cleanup-force-usa-country-updater.user.js",
       "positions": [
         "PRODUCER",
-        "CSR",
-        "SDR"
+        "CSR"
       ],
       "summary": "Cleans AgencyZoom location fields and forces USA in country dropdowns.",
       "details": "Removes same-as-mailing-address boxes and auto-selects USA in country dropdowns on AgencyZoom pages where those location controls appear."
@@ -27,8 +26,7 @@
       "path": "AgencyZoom/Pipeline Click-to-Call/agencyzoom-pipeline-click-to-call-updater.user.js",
       "positions": [
         "PRODUCER",
-        "CSR",
-        "SDR"
+        "CSR"
       ],
       "summary": "Adds call, SMS, email, and note actions to AgencyZoom pipeline views.",
       "details": "Adds AgencyZoom-style action icons to lead pipeline cards and task modals. Phone calls route through RingCentral; notes, SMS, and email actions open the matching AgencyZoom workflows."
