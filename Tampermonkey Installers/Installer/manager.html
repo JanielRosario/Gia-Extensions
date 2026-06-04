@@ -179,6 +179,10 @@
       margin-top: 12px;
     }
 
+    .token-file {
+      display: none;
+    }
+
     .hint {
       color: var(--muted);
       font-size: 0.84rem;
@@ -301,19 +305,23 @@
     <section class="panel">
       <h2>GitHub Save</h2>
       <div class="token-grid">
+        <input class="token-file" type="text" id="githubTokenUsername" name="username" autocomplete="username" value="Tampermonkey Installer Manager" tabindex="-1" aria-hidden="true">
         <label class="field">
           <span>GitHub token</span>
-          <input type="password" id="githubToken" autocomplete="off" spellcheck="false" placeholder="Fine-grained token">
+          <input type="password" id="githubToken" name="password" autocomplete="current-password" spellcheck="false" placeholder="Fine-grained token">
         </label>
         <label class="field">
           <span>Commit message</span>
-          <input type="text" id="commitMessage" value="Update installer positions">
+          <input type="text" id="commitMessage" name="commit-message" autocomplete="on" value="Update installer positions">
         </label>
       </div>
       <div class="actions save-actions">
         <button type="button" class="success" id="saveGitHub">Save to GitHub</button>
+        <button type="button" class="secondary" id="rememberToken">Remember token on this PC</button>
+        <button type="button" class="secondary" id="loadTokenFile">Load token file</button>
       </div>
-      <p class="hint">Token needs Contents: Read and write for JanielRosario/Gia-Extensions.</p>
+      <input class="token-file" type="file" id="tokenFileInput" accept=".txt,text/plain">
+      <p class="hint">Token needs Contents: Read and write for JanielRosario/Gia-Extensions. The remember option uses this browser's password manager; the file option reads a local .txt token file when browser permission allows it.</p>
     </section>
 
     <section class="grid" id="scripts"></section>
@@ -335,6 +343,12 @@
     const DEFAULT_COMMIT_MESSAGE = 'Update installer positions';
     const TOKEN_STORAGE_KEY = 'tampermonkeyInstallerManagerToken';
     const COMMIT_MESSAGE_STORAGE_KEY = 'tampermonkeyInstallerManagerCommitMessage';
+    const CREDENTIAL_ID = 'janiel-gia-extensions-installer-token';
+    const CREDENTIAL_NAME = 'Tampermonkey Installer Manager';
+    const DB_NAME = 'tampermonkeyInstallerManager';
+    const DB_VERSION = 1;
+    const DB_STORE_NAME = 'settings';
+    const TOKEN_FILE_HANDLE_KEY = 'tokenFileHandle';
 
     const state = {
       config: null,
@@ -350,6 +364,9 @@
     const githubTokenInput = document.getElementById('githubToken');
     const commitMessageInput = document.getElementById('commitMessage');
     const saveGitHubButton = document.getElementById('saveGitHub');
+    const rememberTokenButton = document.getElementById('rememberToken');
+    const loadTokenFileButton = document.getElementById('loadTokenFile');
+    const tokenFileInput = document.getElementById('tokenFileInput');
 
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
@@ -406,6 +423,196 @@
     function saveGitHubFields() {
       saveGitHubTokenField();
       saveCommitMessageField();
+    }
+
+    function setTokenValue(token) {
+      githubTokenInput.value = String(token || '').trim();
+      saveGitHubTokenField();
+    }
+
+    function canUsePasswordCredential() {
+      return 'credentials' in navigator && 'PasswordCredential' in window;
+    }
+
+    function buildPasswordCredential(token) {
+      try {
+        return new PasswordCredential({
+          id: CREDENTIAL_ID,
+          name: CREDENTIAL_NAME,
+          password: token
+        });
+      } catch {
+        const form = document.createElement('form');
+        const username = document.createElement('input');
+        const password = document.createElement('input');
+        username.name = 'username';
+        username.value = CREDENTIAL_ID;
+        password.type = 'password';
+        password.name = 'password';
+        password.value = token;
+        form.append(username, password);
+        return new PasswordCredential(form);
+      }
+    }
+
+    async function rememberTokenInPasswordManager(showSuccess = true) {
+      const token = githubTokenInput.value.trim();
+      if (!token) {
+        setStatus('Enter a GitHub token before remembering it.', true);
+        return false;
+      }
+      saveGitHubTokenField();
+      if (!canUsePasswordCredential()) {
+        setStatus('This browser does not support saving this token to the password manager.', true);
+        return false;
+      }
+      try {
+        await navigator.credentials.store(buildPasswordCredential(token));
+        if (showSuccess) {
+          setStatus('Token saved to this browser password manager.');
+        }
+        return true;
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+        return false;
+      }
+    }
+
+    async function loadTokenFromPasswordManager() {
+      if (!canUsePasswordCredential()) return false;
+      try {
+        const credential = await navigator.credentials.get({
+          password: true,
+          mediation: 'optional'
+        });
+        if (credential && credential.id === CREDENTIAL_ID && credential.password) {
+          setTokenValue(credential.password);
+          return true;
+        }
+      } catch {
+        // Password manager retrieval is best-effort.
+      }
+      return false;
+    }
+
+    function openSettingsDb() {
+      return new Promise((resolve, reject) => {
+        if (!('indexedDB' in window)) {
+          reject(new Error('This browser does not support remembered token file handles.'));
+          return;
+        }
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore(DB_STORE_NAME);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Could not open browser storage.'));
+      });
+    }
+
+    async function readDbValue(key) {
+      const db = await openSettingsDb();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(DB_STORE_NAME, 'readonly');
+        const request = transaction.objectStore(DB_STORE_NAME).get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Could not read browser storage.'));
+        transaction.oncomplete = () => db.close();
+      });
+    }
+
+    async function writeDbValue(key, value) {
+      const db = await openSettingsDb();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(DB_STORE_NAME, 'readwrite');
+        transaction.objectStore(DB_STORE_NAME).put(value, key);
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error || new Error('Could not write browser storage.'));
+        };
+      });
+    }
+
+    async function readTokenFromFile(file) {
+      const token = (await file.text()).trim();
+      if (!token) {
+        throw new Error('Token file is empty.');
+      }
+      setTokenValue(token);
+      await rememberTokenInPasswordManager(false);
+      return token;
+    }
+
+    async function readTokenFromHandle(handle, requestAccess) {
+      if (handle.queryPermission) {
+        const permission = await handle.queryPermission({ mode: 'read' });
+        if (permission !== 'granted') {
+          if (!requestAccess || !handle.requestPermission) return false;
+          const requested = await handle.requestPermission({ mode: 'read' });
+          if (requested !== 'granted') return false;
+        }
+      }
+      await readTokenFromFile(await handle.getFile());
+      return true;
+    }
+
+    async function loadRememberedTokenFile(requestAccess = false) {
+      if (!('showOpenFilePicker' in window)) return false;
+      try {
+        const handle = await readDbValue(TOKEN_FILE_HANDLE_KEY);
+        if (!handle) return false;
+        return await readTokenFromHandle(handle, requestAccess);
+      } catch {
+        return false;
+      }
+    }
+
+    async function chooseTokenFile() {
+      try {
+        if ('showOpenFilePicker' in window) {
+          const handles = await window.showOpenFilePicker({
+            multiple: false,
+            types: [{
+              description: 'Text token file',
+              accept: {
+                'text/plain': ['.txt']
+              }
+            }]
+          });
+          const handle = handles[0];
+          await writeDbValue(TOKEN_FILE_HANDLE_KEY, handle);
+          await readTokenFromHandle(handle, true);
+          setStatus('Token loaded from file and remembered for this browser.');
+        } else {
+          tokenFileInput.click();
+        }
+      } catch (error) {
+        if (error && error.name === 'AbortError') return;
+        setStatus(error.message || String(error), true);
+      }
+    }
+
+    async function loadTokenFromInputFile() {
+      const file = tokenFileInput.files && tokenFileInput.files[0];
+      if (!file) return;
+      try {
+        await readTokenFromFile(file);
+        setStatus('Token loaded from file.');
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      } finally {
+        tokenFileInput.value = '';
+      }
+    }
+
+    async function hydrateGitHubToken() {
+      if (githubTokenInput.value.trim()) return;
+      if (await loadTokenFromPasswordManager()) return;
+      await loadRememberedTokenFile(false);
     }
 
     function cloneConfig(config) {
@@ -626,6 +833,7 @@
 
         state.config = config;
         jsonOutput.value = json;
+        await rememberTokenInPasswordManager(false);
         const shortSha = result && result.commit && result.commit.sha ? result.commit.sha.slice(0, 7) : 'saved';
         setStatus(`Saved to GitHub (${shortSha}). GitHub Pages may take a minute to refresh.`);
       } catch (error) {
@@ -670,6 +878,9 @@
     downloadButton.addEventListener('click', downloadConfig);
     copyButton.addEventListener('click', copyConfig);
     saveGitHubButton.addEventListener('click', saveConfigToGitHub);
+    rememberTokenButton.addEventListener('click', () => rememberTokenInPasswordManager(true));
+    loadTokenFileButton.addEventListener('click', chooseTokenFile);
+    tokenFileInput.addEventListener('change', loadTokenFromInputFile);
     githubTokenInput.addEventListener('input', saveGitHubTokenField);
     githubTokenInput.addEventListener('change', saveGitHubTokenField);
     commitMessageInput.addEventListener('input', saveCommitMessageField);
@@ -679,6 +890,7 @@
     window.addEventListener('beforeunload', saveGitHubFields);
 
     loadSavedGitHubFields();
+    hydrateGitHubToken();
     window.setInterval(saveGitHubFields, 1000);
     loadConfig().catch((error) => setStatus(error.message || String(error), true));
   </script>
