@@ -1,0 +1,1307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookmark Manager</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6fa;
+      --surface: #ffffff;
+      --ink: #172033;
+      --muted: #65738a;
+      --line: #d7dfec;
+      --soft: #edf2f8;
+      --blue: #1769e0;
+      --blue-dark: #104fba;
+      --green: #147a4b;
+      --green-dark: #0e603a;
+      --red: #b42318;
+      --amber: #9a5b00;
+      --shadow: 0 8px 22px rgba(23, 32, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: #172033;
+      color: #fff;
+      padding: 20px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+      font-size: 1.75rem;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 1rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+      margin-bottom: 10px;
+    }
+
+    h3 {
+      font-size: 0.95rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+      margin-bottom: 8px;
+    }
+
+    .wrap {
+      width: min(1260px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .subhead {
+      color: #cdd7e5;
+      margin: 0;
+      font-size: 0.94rem;
+    }
+
+    main {
+      padding: 16px 0 42px;
+    }
+
+    .toolbar,
+    .panel,
+    .preview,
+    .tree-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) minmax(190px, 1fr) minmax(240px, 1.2fr) auto;
+      gap: 10px;
+      align-items: end;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    label,
+    .field-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 750;
+      margin-bottom: 5px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      min-height: 38px;
+      padding: 8px 10px;
+    }
+
+    textarea {
+      min-height: 190px;
+      resize: vertical;
+      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+    }
+
+    button,
+    .button {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    button:hover,
+    .button:hover {
+      background: var(--blue-dark);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+    }
+
+    .secondary {
+      background: #fff;
+      border-color: var(--line);
+      color: var(--ink);
+    }
+
+    .secondary:hover {
+      background: var(--soft);
+    }
+
+    .success {
+      background: var(--green);
+    }
+
+    .success:hover {
+      background: var(--green-dark);
+    }
+
+    .danger {
+      background: #fff;
+      border-color: #f0c1bd;
+      color: var(--red);
+    }
+
+    .danger:hover {
+      background: #fff3f2;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .status-line {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .status-line.error {
+      color: var(--red);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(310px, 390px) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .side-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel,
+    .preview,
+    .tree-panel {
+      padding: 14px;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    .inline-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .segmented label {
+      margin: 0;
+      color: var(--ink);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .segmented input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      min-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .segmented span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 7px 10px;
+    }
+
+    .segmented input:checked + span {
+      border-color: #95b8ed;
+      background: #eaf2ff;
+      color: #124d9d;
+    }
+
+    .file-input {
+      min-height: auto;
+      padding: 9px;
+    }
+
+    .preview {
+      margin-bottom: 14px;
+    }
+
+    .bar-frame {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+      overflow: hidden;
+    }
+
+    .bar-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 42px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    .bar-item {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 230px;
+      min-height: 30px;
+      padding: 5px 9px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(23, 32, 51, 0.08);
+    }
+
+    .bar-item.folder {
+      border-color: #c7d8f2;
+      background: #eff6ff;
+    }
+
+    .bar-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.86rem;
+    }
+
+    .bar-count {
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 750;
+    }
+
+    .preview-empty {
+      color: var(--muted);
+      padding: 10px;
+      font-size: 0.9rem;
+    }
+
+    .tree-panel {
+      min-width: 0;
+    }
+
+    .tree {
+      display: grid;
+      gap: 8px;
+    }
+
+    .node {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .node.folder-node {
+      background: #fbfdff;
+    }
+
+    .node-row {
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.2fr) auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .node-type {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .children {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+      padding-left: 16px;
+      border-left: 2px solid #e7edf6;
+    }
+
+    .empty-state {
+      border: 1px dashed #b8c5d8;
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .github-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin: 8px 0 0;
+    }
+
+    .json-output {
+      margin-top: 10px;
+    }
+
+    @media (max-width: 980px) {
+      .toolbar,
+      .workspace,
+      .node-row {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar > .actions,
+      .node-row > .actions {
+        align-items: stretch;
+      }
+
+      button,
+      .button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Bookmark Manager</h1>
+      <p class="subhead">Managed bookmark sets for Chrome and Microsoft Edge staff setup.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="status-line" id="status">Loading bookmark config...</p>
+
+    <section class="toolbar" aria-label="Selection">
+      <div>
+        <label for="agencySelect">Agency</label>
+        <select id="agencySelect"></select>
+      </div>
+      <div>
+        <label for="positionSelect">Position</label>
+        <select id="positionSelect"></select>
+      </div>
+      <div class="inline-grid">
+        <div>
+          <label for="newPositionName">New position</label>
+          <input id="newPositionName" type="text" autocomplete="off" placeholder="Example: Sales Support">
+        </div>
+        <button type="button" id="addPositionButton">Add</button>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" id="refreshButton">Refresh</button>
+        <button type="button" class="secondary" id="downloadButton">Download JSON</button>
+      </div>
+    </section>
+
+    <section class="preview" aria-label="Bookmark bar preview">
+      <h2>Bookmarks bar preview</h2>
+      <div class="bar-frame">
+        <div class="bar-top" id="barPreview"></div>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <div class="side-stack">
+        <section class="panel" aria-label="Add bookmark or folder">
+          <h2>Add to position</h2>
+          <div class="field">
+            <span class="field-label">Type</span>
+            <div class="segmented">
+              <label>
+                <input type="radio" name="newNodeType" value="bookmark" checked>
+                <span>Bookmark</span>
+              </label>
+              <label>
+                <input type="radio" name="newNodeType" value="folder">
+                <span>Folder</span>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="parentSelect">Where</label>
+            <select id="parentSelect"></select>
+          </div>
+          <div class="field">
+            <label for="newTitle">Name</label>
+            <input id="newTitle" type="text" autocomplete="off">
+          </div>
+          <div class="field" id="newUrlField">
+            <label for="newUrl">URL</label>
+            <input id="newUrl" type="url" autocomplete="off" placeholder="https://example.com">
+          </div>
+          <button type="button" id="addNodeButton">Add item</button>
+        </section>
+
+        <section class="panel" aria-label="Import browser bookmarks">
+          <h2>Import bookmark files</h2>
+          <div class="field">
+            <label for="importParentSelect">Where</label>
+            <select id="importParentSelect"></select>
+          </div>
+          <input class="file-input" id="bookmarkFileInput" type="file" accept=".html,.htm,text/html" multiple>
+          <p class="hint">Chrome and Edge bookmark export files are parsed in this browser before saving to GitHub.</p>
+        </section>
+
+        <section class="panel" aria-label="GitHub save">
+          <h2>GitHub save</h2>
+          <div class="github-grid">
+            <div>
+              <label for="githubToken">GitHub token</label>
+              <input id="githubToken" type="password" autocomplete="current-password" spellcheck="false" placeholder="Fine-grained token">
+            </div>
+            <div>
+              <label for="commitMessage">Commit message</label>
+              <input id="commitMessage" type="text" value="Update staff bookmark config">
+            </div>
+            <div class="actions">
+              <button type="button" class="success" id="saveGitHubButton">Save to GitHub</button>
+              <button type="button" class="secondary" id="copyButton">Copy JSON</button>
+            </div>
+          </div>
+          <p class="hint">Token needs Contents: Read and write for JanielRosario/Gia-Extensions.</p>
+        </section>
+
+        <section class="panel" aria-label="Config options">
+          <h2>Config</h2>
+          <div class="field">
+            <label for="managedRootTitle">Managed folder</label>
+            <input id="managedRootTitle" type="text">
+          </div>
+          <textarea class="json-output" id="jsonOutput" spellcheck="false"></textarea>
+        </section>
+      </div>
+
+      <section class="tree-panel" aria-label="Position bookmark tree">
+        <h2>Position bookmarks</h2>
+        <div id="tree" class="tree"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const OWNER = 'JanielRosario';
+    const REPO = 'Gia-Extensions';
+    const BRANCH = 'main';
+    const CONFIG_PATH = 'Bookmark Installer/bookmarks-config.json';
+    const CONFIG_URL = './bookmarks-config.json';
+    const GITHUB_CONTENTS_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${encodeRepoPath(CONFIG_PATH)}`;
+    const DEFAULT_COMMIT_MESSAGE = 'Update staff bookmark config';
+    const TOKEN_STORAGE_KEY = 'staffBookmarkManagerToken';
+    const AGENCIES = [
+      { id: 'ulises-gomez', name: 'Ulises Gomez' },
+      { id: 'carlos-perez', name: 'Carlos Perez' }
+    ];
+    const DEFAULT_POSITIONS = [
+      { id: 'producer', name: 'Producer' },
+      { id: 'csr', name: 'CSR' },
+      { id: 'sdr', name: 'SDR' },
+      { id: 'reception', name: 'Reception' },
+      { id: 'manager', name: 'Manager' }
+    ];
+
+    const state = {
+      config: null,
+      selectedAgencyId: AGENCIES[0].id,
+      selectedPositionId: DEFAULT_POSITIONS[0].id,
+      selectedParentId: '',
+      selectedImportParentId: '',
+      saving: false
+    };
+
+    const agencySelect = document.getElementById('agencySelect');
+    const positionSelect = document.getElementById('positionSelect');
+    const newPositionName = document.getElementById('newPositionName');
+    const addPositionButton = document.getElementById('addPositionButton');
+    const statusEl = document.getElementById('status');
+    const barPreview = document.getElementById('barPreview');
+    const parentSelect = document.getElementById('parentSelect');
+    const importParentSelect = document.getElementById('importParentSelect');
+    const newTitle = document.getElementById('newTitle');
+    const newUrl = document.getElementById('newUrl');
+    const newUrlField = document.getElementById('newUrlField');
+    const addNodeButton = document.getElementById('addNodeButton');
+    const bookmarkFileInput = document.getElementById('bookmarkFileInput');
+    const githubToken = document.getElementById('githubToken');
+    const commitMessage = document.getElementById('commitMessage');
+    const saveGitHubButton = document.getElementById('saveGitHubButton');
+    const copyButton = document.getElementById('copyButton');
+    const downloadButton = document.getElementById('downloadButton');
+    const refreshButton = document.getElementById('refreshButton');
+    const managedRootTitle = document.getElementById('managedRootTitle');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const treeEl = document.getElementById('tree');
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('error', isError);
+    }
+
+    function encodeRepoPath(path) {
+      return path.split('/').map(encodeURIComponent).join('/');
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[character]));
+    }
+
+    function slugify(value) {
+      const slug = String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      return slug || 'position';
+    }
+
+    function createId(prefix) {
+      if (window.crypto && crypto.randomUUID) {
+        return `${prefix}-${crypto.randomUUID()}`;
+      }
+      return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function normalizeTitle(value, fallback) {
+      return String(value || '').replace(/\s+/g, ' ').trim() || fallback;
+    }
+
+    function createDefaultConfig() {
+      return {
+        schemaVersion: 1,
+        updatedAt: new Date().toISOString().slice(0, 10),
+        managedRootTitle: 'GWPC Staff',
+        agencies: AGENCIES.map((agency) => ({
+          ...agency,
+          positions: DEFAULT_POSITIONS.map((position) => ({
+            ...position,
+            bookmarks: []
+          }))
+        }))
+      };
+    }
+
+    function normalizeNode(node) {
+      if (!node || typeof node !== 'object') return null;
+      const isFolder = node.type === 'folder' || Array.isArray(node.children);
+      const title = normalizeTitle(node.title || node.name, isFolder ? 'Folder' : 'Bookmark');
+      if (isFolder) {
+        return {
+          id: node.id || createId('folder'),
+          type: 'folder',
+          title,
+          children: normalizeNodes(node.children)
+        };
+      }
+      const url = String(node.url || '').trim();
+      if (!url) return null;
+      return {
+        id: node.id || createId('bookmark'),
+        type: 'bookmark',
+        title,
+        url
+      };
+    }
+
+    function normalizeNodes(nodes) {
+      return (Array.isArray(nodes) ? nodes : [])
+        .map(normalizeNode)
+        .filter(Boolean);
+    }
+
+    function normalizeConfig(config) {
+      const defaults = createDefaultConfig();
+      const incoming = config && typeof config === 'object' ? config : defaults;
+      const normalized = {
+        schemaVersion: 1,
+        updatedAt: incoming.updatedAt || defaults.updatedAt,
+        managedRootTitle: normalizeTitle(incoming.managedRootTitle, defaults.managedRootTitle),
+        agencies: []
+      };
+
+      AGENCIES.forEach((agency) => {
+        const existingAgency = (incoming.agencies || []).find((item) => item.id === agency.id || item.name === agency.name);
+        const positions = [];
+        const sourcePositions = existingAgency && Array.isArray(existingAgency.positions) ? existingAgency.positions : [];
+
+        sourcePositions.forEach((position) => {
+          const name = normalizeTitle(position.name, position.id || 'Position');
+          const id = slugify(position.id || name);
+          if (!positions.some((item) => item.id === id)) {
+            positions.push({
+              id,
+              name,
+              bookmarks: normalizeNodes(position.bookmarks)
+            });
+          }
+        });
+
+        DEFAULT_POSITIONS.forEach((position) => {
+          if (!positions.some((item) => item.id === position.id)) {
+            positions.push({
+              ...position,
+              bookmarks: []
+            });
+          }
+        });
+
+        normalized.agencies.push({
+          ...agency,
+          positions
+        });
+      });
+
+      return normalized;
+    }
+
+    function getAgency() {
+      return state.config.agencies.find((agency) => agency.id === state.selectedAgencyId) || state.config.agencies[0];
+    }
+
+    function getPosition() {
+      const agency = getAgency();
+      return agency.positions.find((position) => position.id === state.selectedPositionId) || agency.positions[0];
+    }
+
+    function findNode(nodes, id) {
+      for (const node of nodes || []) {
+        if (node.id === id) return node;
+        if (node.type === 'folder') {
+          const found = findNode(node.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function getParentChildren(parentId) {
+      const position = getPosition();
+      if (!parentId) return position.bookmarks;
+      const parent = findNode(position.bookmarks, parentId);
+      if (!parent || parent.type !== 'folder') return position.bookmarks;
+      return parent.children;
+    }
+
+    function flattenFolders(nodes, prefix = '') {
+      const folders = [];
+      (nodes || []).forEach((node) => {
+        if (node.type !== 'folder') return;
+        const path = prefix ? `${prefix} / ${node.title}` : node.title;
+        folders.push({ id: node.id, path });
+        folders.push(...flattenFolders(node.children, path));
+      });
+      return folders;
+    }
+
+    function countBookmarks(nodes) {
+      return (nodes || []).reduce((total, node) => {
+        if (node.type === 'folder') return total + countBookmarks(node.children);
+        return total + 1;
+      }, 0);
+    }
+
+    function findUrlInTree(nodes, url) {
+      const normalizedUrl = String(url || '').trim().toLowerCase();
+      if (!normalizedUrl) return null;
+      for (const node of nodes || []) {
+        if (node.type === 'bookmark' && String(node.url || '').trim().toLowerCase() === normalizedUrl) {
+          return node;
+        }
+        if (node.type === 'folder') {
+          const found = findUrlInTree(node.children, url);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function renderSelectors() {
+      agencySelect.innerHTML = state.config.agencies.map((agency) => (
+        `<option value="${escapeHtml(agency.id)}">${escapeHtml(agency.name)}</option>`
+      )).join('');
+      agencySelect.value = state.selectedAgencyId;
+
+      const agency = getAgency();
+      if (!agency.positions.some((position) => position.id === state.selectedPositionId)) {
+        state.selectedPositionId = agency.positions[0].id;
+      }
+      positionSelect.innerHTML = agency.positions.map((position) => (
+        `<option value="${escapeHtml(position.id)}">${escapeHtml(position.name)}</option>`
+      )).join('');
+      positionSelect.value = state.selectedPositionId;
+    }
+
+    function renderParentOptions(selectEl, selectedId) {
+      const position = getPosition();
+      const folders = flattenFolders(position.bookmarks);
+      const options = [
+        '<option value="">Bookmarks bar</option>',
+        ...folders.map((folder) => `<option value="${escapeHtml(folder.id)}">${escapeHtml(folder.path)}</option>`)
+      ];
+      selectEl.innerHTML = options.join('');
+      selectEl.value = folders.some((folder) => folder.id === selectedId) ? selectedId : '';
+    }
+
+    function renderPreview() {
+      const position = getPosition();
+      if (!position || !position.bookmarks.length) {
+        barPreview.innerHTML = '<div class="preview-empty">No bookmarks added for this position yet.</div>';
+        return;
+      }
+      barPreview.innerHTML = position.bookmarks.map((node) => {
+        const isFolder = node.type === 'folder';
+        const count = isFolder ? `<span class="bar-count">${countBookmarks(node.children)}</span>` : '';
+        return `
+          <div class="bar-item ${isFolder ? 'folder' : ''}" title="${escapeHtml(node.title)}">
+            <span class="bar-title">${escapeHtml(node.title)}</span>
+            ${count}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTreeNodes(nodes) {
+      if (!nodes || !nodes.length) {
+        return '<div class="empty-state">No bookmarks in this position.</div>';
+      }
+      return nodes.map((node) => {
+        const isFolder = node.type === 'folder';
+        return `
+          <div class="node ${isFolder ? 'folder-node' : ''}" data-node-id="${escapeHtml(node.id)}">
+            <div class="node-type">${isFolder ? 'Folder' : 'Bookmark'}</div>
+            <div class="node-row">
+              <div>
+                <label for="title-${escapeHtml(node.id)}">Name</label>
+                <input id="title-${escapeHtml(node.id)}" data-field="title" data-node-id="${escapeHtml(node.id)}" type="text" value="${escapeHtml(node.title)}">
+              </div>
+              <div>
+                ${isFolder ? '<span class="field-label">Contents</span><input type="text" value="Folder" disabled>' : `
+                  <label for="url-${escapeHtml(node.id)}">URL</label>
+                  <input id="url-${escapeHtml(node.id)}" data-field="url" data-node-id="${escapeHtml(node.id)}" type="url" value="${escapeHtml(node.url)}">
+                `}
+              </div>
+              <div class="actions">
+                <button type="button" class="danger" data-action="delete" data-node-id="${escapeHtml(node.id)}">Delete</button>
+              </div>
+            </div>
+            ${isFolder ? `<div class="children">${renderTreeNodes(node.children)}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTree() {
+      const position = getPosition();
+      treeEl.innerHTML = renderTreeNodes(position.bookmarks);
+    }
+
+    function syncOutput() {
+      const config = getExportConfig();
+      jsonOutput.value = `${JSON.stringify(config, null, 2)}\n`;
+    }
+
+    function renderAll() {
+      if (!state.config) return;
+      renderSelectors();
+      managedRootTitle.value = state.config.managedRootTitle;
+      renderParentOptions(parentSelect, state.selectedParentId);
+      renderParentOptions(importParentSelect, state.selectedImportParentId);
+      renderPreview();
+      renderTree();
+      syncOutput();
+    }
+
+    function getExportConfig() {
+      const config = clone(state.config);
+      config.updatedAt = new Date().toISOString().slice(0, 10);
+      return config;
+    }
+
+    function setNodeTypeVisibility() {
+      const type = document.querySelector('input[name="newNodeType"]:checked').value;
+      newUrlField.style.display = type === 'bookmark' ? '' : 'none';
+    }
+
+    function addPosition() {
+      const agency = getAgency();
+      const name = normalizeTitle(newPositionName.value, '');
+      if (!name) {
+        setStatus('Enter a position name before adding it.', true);
+        return;
+      }
+      let id = slugify(name);
+      let suffix = 2;
+      while (agency.positions.some((position) => position.id === id)) {
+        id = `${slugify(name)}-${suffix}`;
+        suffix += 1;
+      }
+      agency.positions.push({ id, name, bookmarks: [] });
+      state.selectedPositionId = id;
+      newPositionName.value = '';
+      setStatus(`Added position ${name}.`);
+      renderAll();
+    }
+
+    function isValidBookmarkUrl(url) {
+      const value = String(url || '').trim();
+      if (!value) return false;
+      return /^[a-z][a-z0-9+.-]*:/i.test(value);
+    }
+
+    function addNode() {
+      const type = document.querySelector('input[name="newNodeType"]:checked').value;
+      const title = normalizeTitle(newTitle.value, type === 'folder' ? 'Folder' : '');
+      const parentChildren = getParentChildren(state.selectedParentId);
+      if (!title) {
+        setStatus('Enter a bookmark name or URL before adding it.', true);
+        return;
+      }
+      if (type === 'folder') {
+        parentChildren.push({
+          id: createId('folder'),
+          type: 'folder',
+          title,
+          children: []
+        });
+        setStatus(`Added folder ${title}.`);
+      } else {
+        const url = String(newUrl.value || '').trim();
+        if (!isValidBookmarkUrl(url)) {
+          setStatus('Enter a valid URL before adding the bookmark.', true);
+          return;
+        }
+        if (findUrlInTree(getPosition().bookmarks, url)) {
+          setStatus('That URL already exists for this position, so it was skipped.', true);
+          return;
+        }
+        parentChildren.push({
+          id: createId('bookmark'),
+          type: 'bookmark',
+          title: title || url,
+          url
+        });
+        setStatus(`Added bookmark ${title || url}.`);
+      }
+      newTitle.value = '';
+      newUrl.value = '';
+      renderAll();
+    }
+
+    function directChild(element, tagName) {
+      return Array.from(element.children || []).find((child) => child.tagName === tagName);
+    }
+
+    function parseBookmarkDl(dl) {
+      const nodes = [];
+      const children = Array.from(dl ? dl.children : []);
+      for (let index = 0; index < children.length; index += 1) {
+        const child = children[index];
+        if (child.tagName !== 'DT') continue;
+
+        const anchor = directChild(child, 'A');
+        if (anchor) {
+          const url = anchor.getAttribute('href') || anchor.href;
+          if (url) {
+            nodes.push({
+              id: createId('bookmark'),
+              type: 'bookmark',
+              title: normalizeTitle(anchor.textContent, url),
+              url
+            });
+          }
+          continue;
+        }
+
+        const heading = directChild(child, 'H3');
+        if (heading) {
+          let folderDl = directChild(child, 'DL');
+          const nextSibling = children[index + 1];
+          if (!folderDl && nextSibling && nextSibling.tagName === 'DL') {
+            folderDl = nextSibling;
+            index += 1;
+          }
+          nodes.push({
+            id: createId('folder'),
+            type: 'folder',
+            title: normalizeTitle(heading.textContent, 'Folder'),
+            children: parseBookmarkDl(folderDl)
+          });
+        }
+      }
+      return nodes;
+    }
+
+    function findBookmarkBarFolder(nodes) {
+      const names = ['bookmarks bar', 'favorites bar', 'bookmarks toolbar'];
+      return (nodes || []).find((node) => (
+        node.type === 'folder' && names.includes(String(node.title || '').trim().toLowerCase())
+      ));
+    }
+
+    function parseBookmarkExport(html) {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const rootDl = doc.querySelector('dl');
+      const nodes = parseBookmarkDl(rootDl);
+      const bookmarksBar = findBookmarkBarFolder(nodes);
+      return bookmarksBar && bookmarksBar.children.length ? bookmarksBar.children : nodes;
+    }
+
+    function cloneNodeForImport(node) {
+      if (node.type === 'folder') {
+        return {
+          id: createId('folder'),
+          type: 'folder',
+          title: node.title,
+          children: (node.children || []).map(cloneNodeForImport)
+        };
+      }
+      return {
+        id: createId('bookmark'),
+        type: 'bookmark',
+        title: node.title,
+        url: node.url
+      };
+    }
+
+    function mergeImportedNodes(targetChildren, incomingNodes, rootChildren, stats) {
+      incomingNodes.forEach((node) => {
+        if (node.type === 'folder') {
+          const existingFolder = targetChildren.find((item) => (
+            item.type === 'folder' && item.title.trim().toLowerCase() === node.title.trim().toLowerCase()
+          ));
+          if (existingFolder) {
+            stats.mergedFolders += 1;
+            mergeImportedNodes(existingFolder.children, node.children || [], rootChildren, stats);
+          } else {
+            const newFolder = {
+              id: createId('folder'),
+              type: 'folder',
+              title: node.title,
+              children: []
+            };
+            targetChildren.push(newFolder);
+            stats.addedFolders += 1;
+            mergeImportedNodes(newFolder.children, node.children || [], rootChildren, stats);
+          }
+          return;
+        }
+
+        if (findUrlInTree(rootChildren, node.url)) {
+          stats.skippedBookmarks += 1;
+          return;
+        }
+        targetChildren.push(cloneNodeForImport(node));
+        stats.addedBookmarks += 1;
+      });
+    }
+
+    async function importBookmarkFiles() {
+      const files = Array.from(bookmarkFileInput.files || []);
+      if (!files.length) return;
+      const parentChildren = getParentChildren(state.selectedImportParentId);
+      const rootChildren = getPosition().bookmarks;
+      const stats = {
+        addedFolders: 0,
+        mergedFolders: 0,
+        addedBookmarks: 0,
+        skippedBookmarks: 0
+      };
+      try {
+        for (const file of files) {
+          const nodes = parseBookmarkExport(await file.text());
+          mergeImportedNodes(parentChildren, nodes, rootChildren, stats);
+        }
+        setStatus(`Imported ${stats.addedBookmarks} bookmarks and ${stats.addedFolders} folders. Skipped ${stats.skippedBookmarks} duplicates.`);
+        renderAll();
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      } finally {
+        bookmarkFileInput.value = '';
+      }
+    }
+
+    function deleteNode(nodes, id) {
+      const index = nodes.findIndex((node) => node.id === id);
+      if (index >= 0) {
+        nodes.splice(index, 1);
+        return true;
+      }
+      for (const node of nodes) {
+        if (node.type === 'folder' && deleteNode(node.children, id)) return true;
+      }
+      return false;
+    }
+
+    function updateNodeField(id, field, value) {
+      const node = findNode(getPosition().bookmarks, id);
+      if (!node) return;
+      if (field === 'title') {
+        node.title = normalizeTitle(value, node.type === 'folder' ? 'Folder' : 'Bookmark');
+      }
+      if (field === 'url' && node.type === 'bookmark') {
+        node.url = String(value || '').trim();
+      }
+      syncOutput();
+    }
+
+    function downloadJson() {
+      const blob = new Blob([jsonOutput.value], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'bookmarks-config.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setStatus('Downloaded bookmark config JSON.');
+    }
+
+    async function copyJson() {
+      try {
+        await navigator.clipboard.writeText(jsonOutput.value);
+        setStatus('Copied bookmark config JSON.');
+      } catch {
+        jsonOutput.select();
+        document.execCommand('copy');
+        setStatus('Selected bookmark config JSON.');
+      }
+    }
+
+    function toBase64Utf8(value) {
+      const bytes = new TextEncoder().encode(value);
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary);
+    }
+
+    async function githubRequest(url, token, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(options.headers || {})
+        }
+      });
+      const text = await response.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
+      if (!response.ok) {
+        const message = data && data.message ? data.message : `GitHub returned ${response.status}`;
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    }
+
+    async function saveToGitHub() {
+      if (state.saving) return;
+      const token = githubToken.value.trim();
+      if (!token) {
+        setStatus('Enter a GitHub token before saving.', true);
+        return;
+      }
+      try {
+        state.saving = true;
+        saveGitHubButton.disabled = true;
+        const parsedConfig = normalizeConfig(JSON.parse(jsonOutput.value));
+        state.config = parsedConfig;
+        const json = `${JSON.stringify(getExportConfig(), null, 2)}\n`;
+        jsonOutput.value = json;
+        let sha = null;
+        setStatus('Reading current GitHub bookmark config...');
+        try {
+          const currentFile = await githubRequest(`${GITHUB_CONTENTS_URL}?ref=${encodeURIComponent(BRANCH)}`, token);
+          sha = currentFile && currentFile.sha ? currentFile.sha : null;
+        } catch (error) {
+          if (error.status !== 404) throw error;
+        }
+
+        setStatus('Saving bookmark config to GitHub...');
+        const payload = {
+          message: commitMessage.value.trim() || DEFAULT_COMMIT_MESSAGE,
+          content: toBase64Utf8(json),
+          branch: BRANCH
+        };
+        if (sha) payload.sha = sha;
+        const result = await githubRequest(GITHUB_CONTENTS_URL, token, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        localStorage.setItem(TOKEN_STORAGE_KEY, token);
+        const shortSha = result && result.commit && result.commit.sha ? result.commit.sha.slice(0, 7) : 'saved';
+        setStatus(`Saved bookmark config to GitHub (${shortSha}).`);
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      } finally {
+        state.saving = false;
+        saveGitHubButton.disabled = false;
+      }
+    }
+
+    async function loadConfig() {
+      setStatus('Loading bookmark config...');
+      try {
+        const response = await fetch(`${CONFIG_URL}?v=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Config returned ${response.status}`);
+        state.config = normalizeConfig(await response.json());
+        setStatus('Loaded bookmark config.');
+      } catch (error) {
+        state.config = createDefaultConfig();
+        setStatus('Started from a blank bookmark config because the saved config could not be loaded.', true);
+      }
+      renderAll();
+    }
+
+    agencySelect.addEventListener('change', () => {
+      state.selectedAgencyId = agencySelect.value;
+      state.selectedPositionId = getAgency().positions[0].id;
+      state.selectedParentId = '';
+      state.selectedImportParentId = '';
+      renderAll();
+    });
+
+    positionSelect.addEventListener('change', () => {
+      state.selectedPositionId = positionSelect.value;
+      state.selectedParentId = '';
+      state.selectedImportParentId = '';
+      renderAll();
+    });
+
+    parentSelect.addEventListener('change', () => {
+      state.selectedParentId = parentSelect.value;
+    });
+
+    importParentSelect.addEventListener('change', () => {
+      state.selectedImportParentId = importParentSelect.value;
+    });
+
+    document.querySelectorAll('input[name="newNodeType"]').forEach((input) => {
+      input.addEventListener('change', setNodeTypeVisibility);
+    });
+
+    addPositionButton.addEventListener('click', addPosition);
+    addNodeButton.addEventListener('click', addNode);
+    bookmarkFileInput.addEventListener('change', importBookmarkFiles);
+    saveGitHubButton.addEventListener('click', saveToGitHub);
+    copyButton.addEventListener('click', copyJson);
+    downloadButton.addEventListener('click', downloadJson);
+    refreshButton.addEventListener('click', loadConfig);
+
+    managedRootTitle.addEventListener('input', () => {
+      state.config.managedRootTitle = normalizeTitle(managedRootTitle.value, 'GWPC Staff');
+      syncOutput();
+    });
+
+    treeEl.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!target.dataset.field || !target.dataset.nodeId) return;
+      updateNodeField(target.dataset.nodeId, target.dataset.field, target.value);
+    });
+
+    treeEl.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!target.dataset.field || !target.dataset.nodeId) return;
+      updateNodeField(target.dataset.nodeId, target.dataset.field, target.value);
+      renderAll();
+    });
+
+    treeEl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action="delete"]');
+      if (!button) return;
+      const position = getPosition();
+      if (deleteNode(position.bookmarks, button.dataset.nodeId)) {
+        setStatus('Deleted bookmark item.');
+        renderAll();
+      }
+    });
+
+    githubToken.value = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+    commitMessage.value = DEFAULT_COMMIT_MESSAGE;
+    setNodeTypeVisibility();
+    loadConfig();
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "GWPC Staff Bookmark Installer",
+  "description": "Adds agency and position bookmark folders to Chrome or Microsoft Edge without deleting personal bookmarks.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "109",
+  "permissions": [
+    "bookmarks",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://raw.githubusercontent.com/JanielRosario/Gia-Extensions/*",
+    "https://janielrosario.github.io/Gia-Extensions/*"
+  ],
+  "action": {
+    "default_title": "Install staff bookmarks",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "options_ui": {
+    "page": "popup.html",
+    "open_in_tab": true
+  }
+}

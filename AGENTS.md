@@ -11,7 +11,9 @@ Read this before making changes in either GIA automation repository.
 
 - Put `.user.js` Tampermonkey scripts, Tampermonkey updater scripts, and script support docs in the UGomez repository.
 - Put Chrome/Edge extension manifests, service workers, content scripts, icons, deployment scripts, and extension docs in the JanielRosario repository.
+- Put extension-related HTML pages, bookmark manager pages, and browser setup/installer HTML pages in the JanielRosario repository.
 - Do not add extension folders or extension deployment workflows to UGomez.
+- Do not add extension-related HTML pages to UGomez.
 - Do not add Tampermonkey script folders to JanielRosario.
 - Before editing update metadata, verify `@updateURL`, `@downloadURL`, GitHub API URLs, and raw GitHub URLs point to the correct source-of-truth repository.
 - If a future change is found in the wrong repository, move the newest version into the correct repository before making additional edits.

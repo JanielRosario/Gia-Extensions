@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff Bookmarks</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="surface">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">GWPC Bookmarks</p>
+        <h1>Staff bookmarks</h1>
+      </div>
+      <span id="configStatus" class="badge neutral">Loading</span>
+    </header>
+
+    <p id="message" class="message">Loading bookmark sets...</p>
+
+    <section class="controls" aria-label="Bookmark selection">
+      <label>
+        <span>Agency</span>
+        <select id="agencySelect"></select>
+      </label>
+      <label>
+        <span>Position</span>
+        <select id="positionSelect"></select>
+      </label>
+      <label class="check-row">
+        <input id="skipExistingAnywhere" type="checkbox" checked>
+        <span>Skip URLs already saved anywhere</span>
+      </label>
+    </section>
+
+    <section class="summary" aria-label="Selected bookmark set">
+      <div>
+        <span>Managed folder</span>
+        <strong id="managedPath">-</strong>
+      </div>
+      <div>
+        <span>Bookmarks</span>
+        <strong id="bookmarkCount">0</strong>
+      </div>
+      <div>
+        <span>Folders</span>
+        <strong id="folderCount">0</strong>
+      </div>
+      <div>
+        <span>Config updated</span>
+        <strong id="updatedAt">-</strong>
+      </div>
+    </section>
+
+    <section class="preview" aria-label="Preview">
+      <p class="preview-title">Preview</p>
+      <div id="previewTree" class="preview-tree"></div>
+    </section>
+
+    <div class="actions">
+      <button id="installButton" class="primary" type="button" disabled>Install bookmarks</button>
+      <button id="refreshButton" class="secondary" type="button">Refresh config</button>
+    </div>
+
+    <section class="result" aria-label="Install result">
+      <pre id="resultLog">No install run yet.</pre>
+    </section>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-05",
+  "managedRootTitle": "GWPC Staff",
+  "agencies": [
+    {
+      "id": "ulises-gomez",
+      "name": "Ulises Gomez",
+      "positions": [
+        {
+          "id": "producer",
+          "name": "Producer",
+          "bookmarks": []
+        },
+        {
+          "id": "csr",
+          "name": "CSR",
+          "bookmarks": []
+        },
+        {
+          "id": "sdr",
+          "name": "SDR",
+          "bookmarks": []
+        },
+        {
+          "id": "reception",
+          "name": "Reception",
+          "bookmarks": []
+        },
+        {
+          "id": "manager",
+          "name": "Manager",
+          "bookmarks": []
+        }
+      ]
+    },
+    {
+      "id": "carlos-perez",
+      "name": "Carlos Perez",
+      "positions": [
+        {
+          "id": "producer",
+          "name": "Producer",
+          "bookmarks": []
+        },
+        {
+          "id": "csr",
+          "name": "CSR",
+          "bookmarks": []
+        },
+        {
+          "id": "sdr",
+          "name": "SDR",
+          "bookmarks": []
+        },
+        {
+          "id": "reception",
+          "name": "Reception",
+          "bookmarks": []
+        },
+        {
+          "id": "manager",
+          "name": "Manager",
+          "bookmarks": []
+        }
+      ]
+    }
+  ]
+}
