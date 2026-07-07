@@ -504,8 +504,9 @@
         <div>
           <label for="newPositionName">New position</label>
           <input id="newPositionName" type="text" autocomplete="off" placeholder="Example: Sales Support">
+          <p class="field-error" id="newPositionError"></p>
         </div>
-        <button type="button" id="addPositionButton">Add</button>
+        <button type="button" id="addPositionButton">Add position</button>
       </div>
       <div class="actions">
         <button type="button" class="secondary" id="refreshButton">Refresh</button>
@@ -639,6 +640,7 @@
     const agencySelect = document.getElementById('agencySelect');
     const positionSelect = document.getElementById('positionSelect');
     const newPositionName = document.getElementById('newPositionName');
+    const newPositionError = document.getElementById('newPositionError');
     const addPositionButton = document.getElementById('addPositionButton');
     const statusEl = document.getElementById('status');
     const barPreview = document.getElementById('barPreview');
@@ -976,13 +978,31 @@
       clearFieldError(newUrl, newUrlError);
     }
 
+    function clearPositionError() {
+      clearFieldError(newPositionName, newPositionError);
+    }
+
     function addPosition() {
+      clearPositionError();
       const agency = getAgency();
       const name = normalizeTitle(newPositionName.value, '');
       if (!name) {
-        setStatus('Enter a position name before adding it.', true);
+        setFieldError(newPositionName, newPositionError, 'The Position dropdown is already selected. Use this box only when creating a new role.');
+        setStatus('Use the Position dropdown for existing roles. New position is only for creating another role.');
         return;
       }
+
+      const existingPosition = agency.positions.find((position) => (
+        position.name.trim().toLowerCase() === name.toLowerCase()
+      ));
+      if (existingPosition) {
+        state.selectedPositionId = existingPosition.id;
+        newPositionName.value = '';
+        setStatus(`Selected existing position ${existingPosition.name}.`);
+        renderAll();
+        return;
+      }
+
       let id = slugify(name);
       let suffix = 2;
       while (agency.positions.some((position) => position.id === id)) {
@@ -1454,6 +1474,7 @@
     });
 
     addPositionButton.addEventListener('click', addPosition);
+    newPositionName.addEventListener('input', clearPositionError);
     addNodeButton.addEventListener('click', addNode);
     newTitle.addEventListener('input', clearAddErrors);
     newUrl.addEventListener('input', clearAddErrors);
