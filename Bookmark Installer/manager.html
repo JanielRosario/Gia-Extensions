@@ -124,6 +124,22 @@
       padding: 8px 10px;
     }
 
+    input[aria-invalid="true"] {
+      border-color: #f0a39d;
+      box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
+    }
+
+    .field-error {
+      display: none;
+      color: var(--red);
+      font-size: 0.8rem;
+      margin: 5px 0 0;
+    }
+
+    .field-error.active {
+      display: block;
+    }
+
     textarea {
       min-height: 190px;
       resize: vertical;
@@ -528,10 +544,12 @@
           <div class="field">
             <label for="newTitle">Name</label>
             <input id="newTitle" type="text" autocomplete="off">
+            <p class="field-error" id="newTitleError"></p>
           </div>
           <div class="field" id="newUrlField">
             <label for="newUrl">URL</label>
             <input id="newUrl" type="url" autocomplete="off" placeholder="https://example.com">
+            <p class="field-error" id="newUrlError"></p>
           </div>
           <button type="button" id="addNodeButton">Add item</button>
         </section>
@@ -629,6 +647,8 @@
     const newTitle = document.getElementById('newTitle');
     const newUrl = document.getElementById('newUrl');
     const newUrlField = document.getElementById('newUrlField');
+    const newTitleError = document.getElementById('newTitleError');
+    const newUrlError = document.getElementById('newUrlError');
     const addNodeButton = document.getElementById('addNodeButton');
     const bookmarkFileInput = document.getElementById('bookmarkFileInput');
     const githubToken = document.getElementById('githubToken');
@@ -936,6 +956,24 @@
     function setNodeTypeVisibility() {
       const type = document.querySelector('input[name="newNodeType"]:checked').value;
       newUrlField.style.display = type === 'bookmark' ? '' : 'none';
+      clearAddErrors();
+    }
+
+    function setFieldError(input, errorElement, message) {
+      input.setAttribute('aria-invalid', 'true');
+      errorElement.textContent = message;
+      errorElement.classList.add('active');
+    }
+
+    function clearFieldError(input, errorElement) {
+      input.removeAttribute('aria-invalid');
+      errorElement.textContent = '';
+      errorElement.classList.remove('active');
+    }
+
+    function clearAddErrors() {
+      clearFieldError(newTitle, newTitleError);
+      clearFieldError(newUrl, newUrlError);
     }
 
     function addPosition() {
@@ -958,21 +996,96 @@
       renderAll();
     }
 
+    function cleanBookmarkUrl(value) {
+      return String(value || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .trim()
+        .replace(/^[<>"']+|[<>"']+$/g, '');
+    }
+
+    function normalizeBookmarkUrl(value) {
+      const url = cleanBookmarkUrl(value);
+      if (!url) return '';
+      if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url;
+      if (/^[^\s@]+\.[^\s@]{2,}([/?#:].*)?$/i.test(url)) {
+        return `https://${url}`;
+      }
+      return url;
+    }
+
     function isValidBookmarkUrl(url) {
-      const value = String(url || '').trim();
-      if (!value) return false;
-      return /^[a-z][a-z0-9+.-]*:/i.test(value);
+      const value = normalizeBookmarkUrl(url);
+      if (!value || !/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function explainBookmarkUrlProblem(rawUrl, titleInput) {
+      const cleanedUrl = cleanBookmarkUrl(rawUrl);
+      const cleanedTitle = cleanBookmarkUrl(titleInput);
+      if (!cleanedUrl) {
+        if (cleanedTitle && isValidBookmarkUrl(cleanedTitle)) {
+          return '';
+        }
+        if (cleanedTitle) {
+          return 'The URL box is empty. Put the website address in URL, or paste a full URL in Name.';
+        }
+        return 'The URL box is empty. Paste a full address like https://chatgpt.com/.';
+      }
+      if (/\s/.test(cleanedUrl)) {
+        return 'The URL contains a space. Remove spaces from the website address.';
+      }
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(cleanedUrl) && !/^[^\s@]+\.[^\s@]{2,}([/?#:].*)?$/i.test(cleanedUrl)) {
+        return 'The URL must start with https:// or look like a domain, for example chatgpt.com.';
+      }
+      const normalizedUrl = normalizeBookmarkUrl(cleanedUrl);
+      try {
+        new URL(normalizedUrl);
+        return '';
+      } catch {
+        return `This does not look like a browser-readable URL: ${cleanedUrl}`;
+      }
+    }
+
+    function titleFromUrl(url) {
+      try {
+        const parsed = new URL(url);
+        return parsed.hostname ? parsed.hostname.replace(/^www\./i, '') : url;
+      } catch {
+        return url;
+      }
+    }
+
+    function getBookmarkDraft() {
+      const titleInput = normalizeTitle(newTitle.value, '');
+      let url = normalizeBookmarkUrl(newUrl.value);
+      let title = titleInput;
+
+      if (!url && titleInput) {
+        const titleAsUrl = normalizeBookmarkUrl(titleInput);
+        if (isValidBookmarkUrl(titleAsUrl)) {
+          url = titleAsUrl;
+          title = titleFromUrl(url);
+        }
+      }
+
+      if (!title && url) {
+        title = titleFromUrl(url);
+      }
+
+      return { title, url };
     }
 
     function addNode() {
+      clearAddErrors();
       const type = document.querySelector('input[name="newNodeType"]:checked').value;
-      const title = normalizeTitle(newTitle.value, type === 'folder' ? 'Folder' : '');
       const parentChildren = getParentChildren(state.selectedParentId);
-      if (!title) {
-        setStatus('Enter a bookmark name or URL before adding it.', true);
-        return;
-      }
       if (type === 'folder') {
+        const title = normalizeTitle(newTitle.value, 'Folder');
         parentChildren.push({
           id: createId('folder'),
           type: 'folder',
@@ -981,9 +1094,11 @@
         });
         setStatus(`Added folder ${title}.`);
       } else {
-        const url = String(newUrl.value || '').trim();
+        const { title, url } = getBookmarkDraft();
         if (!isValidBookmarkUrl(url)) {
-          setStatus('Enter a valid URL before adding the bookmark.', true);
+          const explanation = explainBookmarkUrlProblem(newUrl.value, newTitle.value);
+          setFieldError(newUrl, newUrlError, explanation || 'Enter a valid URL before adding the bookmark.');
+          setStatus(explanation || 'Enter a valid URL before adding the bookmark.', true);
           return;
         }
         if (findUrlInTree(getPosition().bookmarks, url)) {
@@ -1340,6 +1455,8 @@
 
     addPositionButton.addEventListener('click', addPosition);
     addNodeButton.addEventListener('click', addNode);
+    newTitle.addEventListener('input', clearAddErrors);
+    newUrl.addEventListener('input', clearAddErrors);
     bookmarkFileInput.addEventListener('change', importBookmarkFiles);
     saveGitHubButton.addEventListener('click', saveToGitHub);
     copyButton.addEventListener('click', copyJson);
