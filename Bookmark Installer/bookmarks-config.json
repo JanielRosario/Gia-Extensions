@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-06-05",
+  "updatedAt": "2026-07-07",
   "agencies": [
     {
       "id": "ulises-gomez",
@@ -9,7 +9,289 @@
         {
           "id": "producer",
           "name": "Producer",
-          "bookmarks": []
+          "bookmarks": [
+            {
+              "id": "bookmark-4983e3cc-d68d-4c6d-ba37-418e7088e47f",
+              "type": "bookmark",
+              "title": "ChatGPT",
+              "url": "https://chatgpt.com/"
+            },
+            {
+              "id": "folder-a4eb0054-9065-46fd-a4fa-35d4d8f380ad",
+              "type": "folder",
+              "title": "Farmers",
+              "children": [
+                {
+                  "id": "bookmark-5cb822e0-0821-430b-a955-bde33497ba37",
+                  "type": "bookmark",
+                  "title": "Farmers APEX",
+                  "url": "https://eagent.farmersinsurance.com/login.html"
+                },
+                {
+                  "id": "bookmark-08263795-1d8c-4181-88a2-b4171e19d7b4",
+                  "type": "bookmark",
+                  "title": "Farmers eCMS",
+                  "url": "https://eagentsaml.farmersinsurance.com/login.html?fromURI=https%3A%2F%2Ffarmersinsurance.okta.com%2Fapp%2Ffarmersinsuranceprod_oagagencydashboard_1%2Fexkfl13lmyrDV3Jtv1t7%2Fsso%2Fsaml%3FSAMLRequest%3DfZJdb9owFIb%252FSuR7Yhwni7AAiRVNo%252Bo2VFgveoMc%252BwAWiZ36OKzs19cJ%252B%252BhUrVeWXp%252F3OZ9TlE3dikUXjvYenjrAkDw3tUUxfMxI561wEg0KKxtAEZTYLL7ciSwdi9a74JSrySvL%252Bw6JCD4YZ0myWs7IDnJeZZOcKZkxxjWUmpUlL6qJ5Hmh1YeyzEtW8nwyJskDeIzOGYmgaEfsYGUxSBuiNM6K0TgbZXybZYLngpePJFnGboyVYXAdQ2hRULqXvulJFjsvrYLUnYJMlWuobNs3v7FFvXPyIA9g1UVLPFZOer1jFJ5P%252B5rxurn45QO%252FDWcWSoroaD8Fkix%252Bd3rjIisyN%252BDPRsH3%252B7u%252FtUCPDembkvpqmmrx87Gw5yfaON3VkLbHdmBTvL7ZSCocVA2nc6HtbUOS9a%252BVfDRWG3t4fxvVNQjF5%252B12PVp%252F22zJfNqjxTBdP%252F8DntLX8vR6NF8jcLVcu9qoS%252FLJ%252BUaG%252F%252BdjKRsUo0f7IVR0FltQZm9Ax3HVtftx40EGmJHgOyB0fk3673HOXwA%253D%26RelayState%3Dhttps%253A%252F%252Feagent.farmersinsurance.com%252FPLA%252FeAgent%252Ficms%252FeCMSRedirectPageExt.viewPhonebookSearchFormExt.null.icms%253Freq_page%253DviewPhonebookSearchFormExt%2526wintag%253D1701107478267"
+                },
+                {
+                  "id": "bookmark-ece812f9-47ab-4b84-ba2a-2e198d11000c",
+                  "type": "bookmark",
+                  "title": "Ask Service Ops",
+                  "url": "https://farmerssrm.my.site.com/AgencyCommunityPortal/s/"
+                },
+                {
+                  "id": "bookmark-e7b2ae20-509b-43a4-9e24-d0d9bd7ecd5d",
+                  "type": "bookmark",
+                  "title": "Kraft Lake",
+                  "url": "https://farmersinsurance.okta.com/app/farmersinsurance_apexaem_1/exkjmgo355wpdG8C81t7/sso/saml"
+                },
+                {
+                  "id": "bookmark-390a9bf6-e3c2-4f16-82ae-6feadb4cb306",
+                  "type": "bookmark",
+                  "title": "LifeNet",
+                  "url": "https://farmersinsurance.okta.com/app/farmersinsurance_oagfarmerslife_1/exkf83hgo3YzEc1FZ1t7/sso/saml?SAMLRequest=fZJvb9MwEMa%2FSuT3iRMnXYPVVupWJso2Gq0Fwd5Uxr601hI7%2BBy68elx0wFFiL2y9Nw9v%2Fvjm6Bom47Pe7839%2FCtB%2FTRU9sY5ENgSnpnuBWokRvRAnIv%2BXp%2Bd8tZkvLOWW%2BlbciZ5XWHQATntTUkWi6mZJuqXKSjUl4U6g1IBkXJZMqK9CKTRZbLWpXpuC6ZEhmJPoHD4JySAAp2xB6WBr0wPkgpG8Upi1m%2BYYznBc9HDyRahGm0EX5w7b3vkFNaC9ceSQZ7J4yExD56kUjbUtF1%2F0S3VuxetEbXsM0oPD3WZb7f2fzLj7cyu37I%2FJgiWnqcnkTzXxNe2cAIvjW471rCx%2FvbPz0cDofkjDpU%2F1yli%2Fc3N%2BNn2lrVN5B0%2B25gUjy9LBYSB%2FXyTo13qxV0JKpevuBSG6XN7vXtfz0lIX%2B32VRxtVpvyGxyRPNhm272Gzyh5%2FLkdCQfAnC5qGyj5XN0bV0r%2FP%2FrZUk2KFrF9ZDKe4MdSF1rUGFNTWMPVw6EhynxrgdCZ6eifx%2Fj7Cc%3D&RelayState=https%3A%2F%2Fwww.farmerslife.com%2FFarmersLife.aspx"
+                },
+                {
+                  "id": "bookmark-29e99ab3-e04c-468c-98ad-ffcd4e029519",
+                  "type": "bookmark",
+                  "title": "Gustavo Uribe - Farmers Life",
+                  "url": "https://outlook.office365.com/book/GustavoUribe@Farmersinsurance.onmicrosoft.com/"
+                }
+              ]
+            },
+            {
+              "id": "folder-9a917818-d3bf-4ba9-9e01-1ff052fb6850",
+              "type": "folder",
+              "title": "Carriers",
+              "children": [
+                {
+                  "id": "folder-2fbfd607-7c36-436a-8c22-973a82ec2e33",
+                  "type": "folder",
+                  "title": "CA FairPlan",
+                  "children": [
+                    {
+                      "id": "bookmark-de6a5820-8643-4f84-bf8c-9c9b9405943b",
+                      "type": "bookmark",
+                      "title": "Policy Status",
+                      "url": "https://action.cfpnet.com/#/policy-status"
+                    },
+                    {
+                      "id": "bookmark-e7a984b8-992e-4ca7-8793-08bdd4438ded",
+                      "type": "bookmark",
+                      "title": "Check Payment",
+                      "url": "https://action.cfpnet.com/#/check-payment"
+                    },
+                    {
+                      "id": "bookmark-fc89f2dc-b565-433f-8001-5bd637ff27d5",
+                      "type": "bookmark",
+                      "title": "Make a Payment",
+                      "url": "https://action.cfpnet.com/#/make-payment"
+                    }
+                  ]
+                },
+                {
+                  "id": "folder-1c530e6d-06c9-4f5d-8bb6-4797916d8aac",
+                  "type": "folder",
+                  "title": "Commercial and Others",
+                  "children": [
+                    {
+                      "id": "bookmark-1deb5962-ead7-42aa-99bb-589e0ece225f",
+                      "type": "bookmark",
+                      "title": "Rainbow Insurance",
+                      "url": "https://app.userainbow.com/auth/login?role=agent&title=Login+To+View+Your+Dashboard&text=Once+you%27ve+logged+in%2C+you%27ll+be+able+to+view+your+dashboard.&onLogin=%2Fagent_dashboard%2Fpolicies"
+                    },
+                    {
+                      "id": "bookmark-c34eb2a0-f228-452a-b03a-4f344c60ea0a",
+                      "type": "bookmark",
+                      "title": "USLI",
+                      "url": "https://retail.usli.com/unauthorized"
+                    },
+                    {
+                      "id": "bookmark-085bd08d-c3e2-4eb0-8e97-18ad3fb2ec65",
+                      "type": "bookmark",
+                      "title": "BTIS",
+                      "url": "https://kraftlake.btisinc.com/Login"
+                    },
+                    {
+                      "id": "bookmark-417a5567-5070-4d22-9d7f-2f2d894e9f5a",
+                      "type": "bookmark",
+                      "title": "Hiscox",
+                      "url": "https://prodb2chiscoxus.b2clogin.com/prodb2chiscoxus.onmicrosoft.com/b2c_1a_signin_only/oauth2/v2.0/authorize?p=B2C_1A_signin_only&response_type=id_token&client_id=6e3b735d-ca61-43fe-b99f-ef7afc63951f&response_mode=form_post&redirect_uri=https%3A%2F%2Fportal.hiscox.com%2Foneshield%2Fsso&scope=openid&state=35992260&nonce=_ef044ec8-c9fd-4f7a-8b1d-0ec45d86940b"
+                    },
+                    {
+                      "id": "bookmark-d0313de9-13d6-4b34-8f72-08990bf70f60",
+                      "type": "bookmark",
+                      "title": "BerkleyNet | Policy",
+                      "url": "https://bnetportal.berkleynet.com/wps/portal/berkleynet/policy"
+                    }
+                  ]
+                },
+                {
+                  "id": "bookmark-118fdc6e-0354-4756-8729-d35878d169dd",
+                  "type": "bookmark",
+                  "title": "Bamboo Insurance",
+                  "url": "https://bambooinsurance.com/agent-access/"
+                },
+                {
+                  "id": "bookmark-3e493a29-dd3e-4e95-9a21-7ffef26cf0e7",
+                  "type": "bookmark",
+                  "title": "Aegis Insurance",
+                  "url": "https://prod.aegisinsurance.com/GameChanger/Portal/Account/LogOn"
+                },
+                {
+                  "id": "bookmark-3f0800fb-31a0-4aec-9507-4800badc9efd",
+                  "type": "bookmark",
+                  "title": "Pacific Specialty",
+                  "url": "https://myportal.pacificspecialty.com/login"
+                },
+                {
+                  "id": "bookmark-8c271633-0738-477c-aa97-d96ecc8a8eeb",
+                  "type": "bookmark",
+                  "title": "PersonalUmbrella",
+                  "url": "https://www.personalumbrella.com/"
+                },
+                {
+                  "id": "bookmark-3e50ac89-2656-4603-866b-d1e01d19dd2e",
+                  "type": "bookmark",
+                  "title": "Jewelry Mutuals",
+                  "url": "https://identity.platform.jewelersmutual.com/Account/Login?returnurl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dc2113d29-af14-4f01-9ea5-582bbf888799%26redirect_uri%3Dhttps%253A%252F%252Fportal.jewelersmutual.com%252Fcallback.html%26response_type%3Dcode%26scope%3Dopenid%2520profile%2520partyAPI%2520platformAPI%2520offline_access%26state%3Dbec5c802bc214f75baac25ba37c38eca%26code_challenge%3DmlbMD5_KUygBM-ysj6TCMCN82ruO9PS3LQcMFFJcIrQ%26code_challenge_method%3DS256%26response_mode%3Dquery"
+                },
+                {
+                  "id": "bookmark-31564f84-a5c3-4f28-99ab-64193cfc7d40",
+                  "type": "bookmark",
+                  "title": "Ca Fair Plan",
+                  "url": "https://uep93.duckcreekondemand.com/policy/express.aspx#/me/express/defaultViewmodel"
+                },
+                {
+                  "id": "bookmark-ec7284f6-6878-4957-bd59-88c37639569b",
+                  "type": "bookmark",
+                  "title": "The California FAIR Plan",
+                  "url": "https://www.cfpnet.com/"
+                },
+                {
+                  "id": "bookmark-2c76064b-ea27-4afb-a4fc-59f36c143e9e",
+                  "type": "bookmark",
+                  "title": "MyCoverageInfo - Agent",
+                  "url": "https://www.mycoverageinfo.com/agent"
+                },
+                {
+                  "id": "bookmark-1eae8647-2498-4b62-b7f9-278600f749ec",
+                  "type": "bookmark",
+                  "title": "Aon Edge Agency Portal",
+                  "url": "https://c68-prod.diamondasaservice.com/DiamondWeb/(S(q04bi0amleaplmldv4pyd5se))/home.aspx"
+                },
+                {
+                  "id": "bookmark-9748ba07-4f37-405d-9cd3-758f062b4b4c",
+                  "type": "bookmark",
+                  "title": "National General",
+                  "url": "https://natgenagency.com/Policy/PolicyBillPlans.aspx"
+                },
+                {
+                  "id": "bookmark-eab8edb6-4485-43dd-93ed-52a42c22c59c",
+                  "type": "bookmark",
+                  "title": "progressive",
+                  "url": "https://www.foragentsonlylogin.progressive.com/Login/?flowId=IYbNLcr1ZB"
+                },
+                {
+                  "id": "bookmark-a794a98c-2a15-4f7d-a615-5a863b365c46",
+                  "type": "bookmark",
+                  "title": "Mercury Insurance",
+                  "url": "https://transcendac.mercuryinsurance.com/pc/PolicyCenter.do"
+                }
+              ]
+            },
+            {
+              "id": "folder-9a13be4d-713a-4a6f-b812-515ebce9e371",
+              "type": "folder",
+              "title": "Tools & Resources",
+              "children": [
+                {
+                  "id": "bookmark-79c7d75b-0950-4417-a66e-e93c7a971719",
+                  "type": "bookmark",
+                  "title": "Docusign",
+                  "url": "https://www.docusign.com/"
+                },
+                {
+                  "id": "bookmark-d61bb5e9-1b7c-4f25-bff2-3790ca9acc00",
+                  "type": "bookmark",
+                  "title": "Merge PDF",
+                  "url": "https://smallpdf.com/merge-pdf"
+                },
+                {
+                  "id": "bookmark-5714b571-869b-4a9c-a62f-1a34879a94e0",
+                  "type": "bookmark",
+                  "title": "Senior Discount Course",
+                  "url": "https://www.10dollarmaturedrivers.com/"
+                },
+                {
+                  "id": "bookmark-5ddd8174-1b8c-4828-97ef-dc8fffbab4b9",
+                  "type": "bookmark",
+                  "title": "Reconstruction Cost Calculator",
+                  "url": "https://gomezagency.net/zipcodes.html"
+                },
+                {
+                  "id": "bookmark-bf97142b-de56-49ef-be1e-5ecc69744881",
+                  "type": "bookmark",
+                  "title": "Amortization Calculator",
+                  "url": "https://www.bankrate.com/mortgages/amortization-calculator/"
+                },
+                {
+                  "id": "bookmark-dd8fc641-f9eb-4c7f-8cfc-c2d85d9648e4",
+                  "type": "bookmark",
+                  "title": "Teacher credentials",
+                  "url": "https://educator.ctc.ca.gov/siebel/app/esales/enu/?SWECmd=GotoView&SWEView=CTC+Public+Search+Query+View+Web&SWERF=1&SWEHo=&SWEBU=1"
+                },
+                {
+                  "id": "bookmark-0aa4530d-ee23-4385-bd62-f2875234f836",
+                  "type": "bookmark",
+                  "title": "CEA Earthquake",
+                  "url": "https://cpp-far-pd.calquake.com/DiamondWeb/(S(sxhjihk3legol4to4o1kxfhb))/controlloader.aspx?p=Agency#top"
+                },
+                {
+                  "id": "bookmark-445464d5-d56a-4445-9297-f46601278de7",
+                  "type": "bookmark",
+                  "title": "Aon Edge Agency Portal",
+                  "url": "https://c68-prod.diamondasaservice.com/DiamondWeb/(S(cggjxwe0plddj1vpgsbgs4js))/controlloader.aspx?p=Agency"
+                },
+                {
+                  "id": "bookmark-09a755d4-06ac-4928-82c4-4d702b427823",
+                  "type": "bookmark",
+                  "title": "ForemostSTAR",
+                  "url": "https://www.foremoststar.com/nssWeb/pages/search.xhtml?fromSource=Apex&isRetrievePolicyReq=YES&policyNumber=0075739049&tabId=RetrieveQuote&target=Search"
+                }
+              ]
+            },
+            {
+              "id": "bookmark-382a0b1d-367c-459c-967b-de211f285ae8",
+              "type": "bookmark",
+              "title": "Insurance Sales Lab",
+              "url": "https://app.insurancesaleslab.com/"
+            },
+            {
+              "id": "bookmark-f0bcb99f-05f3-457e-9164-5bda2f3091f2",
+              "type": "bookmark",
+              "title": "Agency Zoom",
+              "url": "https://app.agencyzoom.com/login"
+            },
+            {
+              "id": "bookmark-8bf89b49-16aa-4f46-98d6-16192e56373f",
+              "type": "bookmark",
+              "title": "Protect Your Home: Moen & Farmers Insurance® Exclusive Offer",
+              "url": "https://shop.moen.com/pages/farmers-insurance"
+            },
+            {
+              "id": "bookmark-d40d4e0c-cb83-426d-ab2b-0d6766557dc8",
+              "type": "bookmark",
+              "title": "CP - Personal Lines - Quote Form - Internal",
+              "url": "https://form.jotform.com/243380619756162"
+            },
+            {
+              "id": "bookmark-d6345283-1872-4f02-ac4f-60b6f6c3cbcf",
+              "type": "bookmark",
+              "title": "MexiPass - Portal",
+              "url": "https://mexipass.quickbase.com/db/bpsuhdfzc?a=dbpage&pageName=portal.html&eyJwIjoiL21leGlhdXRvLXJhdGVyIiwiYXJncyI6eyJhcHBpZCI6ImJwc3VoZGZ6YyJ9fQ%3D%3D"
+            }
+          ]
         },
         {
           "id": "csr",
