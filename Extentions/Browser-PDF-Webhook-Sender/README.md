@@ -7,10 +7,24 @@ Internal Chrome and Microsoft Edge extension MVP for caching readable PDFs and s
 1. Open `chrome://extensions` or `edge://extensions`.
 2. Enable Developer mode.
 3. Choose Load unpacked.
-4. Select this folder: `pdf-webhook-extension`.
+4. Select this folder: `Extentions/Browser-PDF-Webhook-Sender`.
 5. Open the extension settings and choose a send target. A webhook URL is only required for `Webhook only` or `Quote-to-Email and webhook`.
 
 After changing extension files, click Reload on the extension card, then refresh the page tab.
+
+## Install or Update for Staff
+
+Use the managed installer page:
+
+```text
+https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Sender/
+```
+
+Chrome and Edge do not allow one-click installs for extensions hosted outside the Chrome Web Store. The page provides the closest supported flow: download/run the Windows installer as Administrator. It configures Chrome and Edge policy so the browser installs the signed CRX from this repo's GitHub Pages update feed.
+
+For people who already installed the managed version, updates are automatic after `manifest.json` version is bumped, changes are pushed to `main`, and the GitHub Pages deploy workflow publishes the new CRX/update manifest. Restart Chrome/Edge to pick up the update faster.
+
+For people using a local unpacked developer copy, install the managed version from the page above, then remove or disable the old unpacked copy in `chrome://extensions` / `edge://extensions`.
 
 ## Browser Button
 
@@ -23,6 +37,8 @@ For Guidewire/PolicyCenter/GWPC pages, a content script watches the known GWPC `
 The GWPC trigger is refreshed automatically when the extension starts and when a PolicyCenter tab updates. It also prepares the watcher as soon as the Download button appears, and again on hover/pointer-down, so the watcher should already be armed before the real Download click fires. If Chrome does not expose the PDF POST request body through `webRequest`, a temporary page hook captures the matching PolicyCenter form submit in memory as a fallback replay source. Diagnostic logs list field names/counts only, not field values.
 
 For Aegis/GameChanger quote pages, a content script watches for the `Print Quote` dialog iframe (`#pdfQuoteIframe`). When the iframe points at `/GameChanger/PolicyFrame/Quote/QuotePrintPdf`, the extension fetches that iframe URL with the current browser session, verifies the response is a PDF, and caches it for the current tab. It does not send automatically; click the extension icon after the `PDF` badge appears. If the auto watcher misses the iframe, clicking the extension icon on an Aegis tab also scans the open page for `#pdfQuoteIframe`, caches it, then sends it.
+
+For Alta presentation pages, the visible preview is HTML and Chrome's print preview keeps the generated PDF behind internal `chrome://print` URLs. Clicking the extension icon on `https://alta.farmers.com/quote/presentation` uses Alta's `Download/Print` button, captures the temporary printable tab with Chrome's PDF generator, closes the temporary print tabs, and sends that quote PDF.
 
 To change settings, right-click the extension icon and open Options, or use the extension card in `chrome://extensions` or `edge://extensions`.
 The Options page also includes a diagnostics section with refresh and copy buttons.
@@ -74,13 +90,12 @@ Remote config is data only. Extension JavaScript must stay packaged inside the e
 
 ## Troubleshooting
 
-- This version does not request the Chrome browser-control permission, does not use Chrome print-to-PDF, and does not attach to Chrome's browser-control APIs.
 - Toolbar sending requires either a cached PDF for the current tab or a current tab that can be read directly as a PDF. In GWPC, click the GWPC `Download` button first, wait for the `PDF` badge, then click the extension icon. In Aegis, click `Print Quote`, wait for the quote PDF dialog and the `PDF` badge, then click the extension icon.
 - Current-tab PDF fallback requires the current tab URL/response to clearly identify a PDF, such as `application/pdf` or a `.pdf` filename.
 - If the Quote-to-Email dashboard is not logged in or never posts ready, the pending PDF is discarded after about 2 minutes.
 - If the webhook shows a long string beginning with `JVBERi0x`, it received a base64 PDF. Switch Send mode to `Multipart PDF upload` or `Raw PDF body` if your webhook needs a file/binary request.
 - If the extension shows a `SET` badge while using a webhook delivery mode, add a webhook URL from right-click Options.
-- Generated report tabs with `about:blank` URLs are not converted through Chrome print-to-PDF in this build.
+- Alta uses Chrome's PDF generator only for the temporary printable tab created by Alta's own `Download/Print` button.
 - Local `file://` pages require enabling Allow access to file URLs on the extension card.
 
 ## Enterprise deployment notes

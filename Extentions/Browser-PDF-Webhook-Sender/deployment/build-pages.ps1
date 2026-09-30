@@ -201,20 +201,86 @@ pause
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Browser PDF Webhook Sender</title>
+    <style>
+      body {
+        color: #172033;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        background: #f6f8fb;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+      section {
+        background: #fff;
+        border: 1px solid #d9e1ee;
+        border-radius: 8px;
+        margin: 16px 0;
+        padding: 20px;
+      }
+      h1, h2 {
+        line-height: 1.2;
+      }
+      .button {
+        display: inline-block;
+        background: #005eb8;
+        border-radius: 6px;
+        color: #fff;
+        font-weight: 700;
+        margin: 8px 8px 8px 0;
+        padding: 12px 16px;
+        text-decoration: none;
+      }
+      code, pre {
+        background: #eef2f7;
+        border-radius: 6px;
+      }
+      code {
+        padding: 2px 5px;
+      }
+      pre {
+        overflow-x: auto;
+        padding: 12px;
+      }
+      .muted {
+        color: #526070;
+      }
+    </style>
   </head>
   <body>
-    <h1>Browser PDF Webhook Sender</h1>
-    <p>Version: $version</p>
-    <p>Extension ID: <code>$extensionId</code></p>
-    <ul>
-      <li><a href="./update.xml">update.xml</a></li>
-      <li><a href="./$packageSlug-$version.crx">$packageSlug-$version.crx</a></li>
-      <li><a href="./install-managed-extension.ps1">install-managed-extension.ps1</a></li>
-      <li><a href="./install-managed-extension.bat">install-managed-extension.bat</a></li>
-    </ul>
-    <p>Install command, run as Administrator:</p>
-    <pre>powershell -ExecutionPolicy Bypass -Command "irm '$installerPs1Url' | iex"</pre>
+    <main>
+      <h1>Browser PDF Webhook Sender</h1>
+      <p class="muted">Version $version &middot; Extension ID <code>$extensionId</code></p>
+
+      <section>
+        <h2>Install or Update</h2>
+        <p>Download the Windows installer, then right-click it and choose <strong>Run as administrator</strong>. It configures Chrome and Edge to install this managed extension and receive future updates from this page.</p>
+        <p><a class="button" href="./install-managed-extension.bat">Download installer</a></p>
+        <p class="muted">Already installed with this managed installer? Restart Chrome or Edge after a new version is published. Running this installer again is safe and refreshes the browser policy.</p>
+      </section>
+
+      <section>
+        <h2>Administrator Command</h2>
+        <p>Run this in an elevated PowerShell window:</p>
+        <pre>powershell -ExecutionPolicy Bypass -Command "irm '$installerPs1Url' | iex"</pre>
+      </section>
+
+      <section>
+        <h2>Files</h2>
+        <ul>
+          <li><a href="./update.xml">update.xml</a></li>
+          <li><a href="./$packageSlug-$version.crx">$packageSlug-$version.crx</a></li>
+          <li><a href="./install-managed-extension.ps1">install-managed-extension.ps1</a></li>
+          <li><a href="./install-managed-extension.bat">install-managed-extension.bat</a></li>
+        </ul>
+        <p class="muted">Chrome and Edge do not allow true one-click installs for extensions hosted outside their stores. This managed installer is the supported internal install/update path.</p>
+      </section>
+    </main>
   </body>
 </html>
 "@

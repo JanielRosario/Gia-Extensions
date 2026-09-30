@@ -2745,9 +2745,19 @@ async function findBrowserPdf(tab) {
     return directPdf;
   }
 
-  const candidates = await discoverPdfCandidates(tab);
+  if (isAltaPresentationUrl(tab.url || "")) {
+    const altaPdf = await tryPrintAltaPresentationPdf(tab);
 
-  for (const candidate of candidates.slice(0, MAX_PDF_CANDIDATES)) {
+    if (altaPdf) {
+      return altaPdf;
+    }
+  }
+
+  const candidates = await discoverPdfCandidates(tab);
+  const visibleCandidates = candidates.filter((candidate) => candidate.visible === true);
+  const candidatesToTry = visibleCandidates.length ? visibleCandidates : candidates;
+
+  for (const candidate of candidatesToTry.slice(0, MAX_PDF_CANDIDATES)) {
     const pdf = candidate.url.startsWith("blob:")
       ? await tryReadBlobPdfInPage(tab, candidate)
       : await tryReadPdfFromUrl(candidate.url, {
@@ -2780,24 +2790,201 @@ async function discoverPdfCandidates(tab) {
     const candidates = results.flatMap((result) => Array.isArray(result?.result?.candidates)
       ? result.result.candidates
       : []);
-    const unique = [];
-    const seen = new Set();
+    const bestByUrl = new Map();
 
     for (const candidate of candidates) {
-      if (!candidate?.url || seen.has(candidate.url)) {
+      if (!candidate?.url) {
         continue;
       }
 
-      seen.add(candidate.url);
-      unique.push({
+      const normalized = {
         url: candidate.url,
-        source: candidate.source || "page"
-      });
+        source: candidate.source || "page",
+        tagName: candidate.tagName || "",
+        visible: candidate.visible === true,
+        inViewport: candidate.inViewport === true,
+        visibleArea: Number(candidate.visibleArea) || 0
+      };
+      const existing = bestByUrl.get(candidate.url);
+
+      if (!existing || comparePdfCandidates(normalized, existing) < 0) {
+        bestByUrl.set(candidate.url, normalized);
+      }
     }
 
-    return unique;
+    return Array.from(bestByUrl.values()).sort(comparePdfCandidates);
   } catch {
     return [];
+  }
+}
+
+function comparePdfCandidates(left, right) {
+  const leftRank = getPdfCandidateRank(left);
+  const rightRank = getPdfCandidateRank(right);
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  if ((left.inViewport === true) !== (right.inViewport === true)) {
+    return left.inViewport === true ? -1 : 1;
+  }
+
+  return (right.visibleArea || 0) - (left.visibleArea || 0);
+}
+
+function getPdfCandidateRank(candidate = {}) {
+  if (candidate.source === "location") {
+    return 0;
+  }
+
+  if (candidate.visible === true) {
+    return /^(embed|iframe|object)$/i.test(candidate.tagName || "") ? 1 : 2;
+  }
+
+  return String(candidate.source || "").includes("performance") ? 4 : 3;
+}
+
+function isAltaPresentationUrl(url = "") {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === "alta.farmers.com" && parsed.pathname === "/quote/presentation";
+  } catch {
+    return false;
+  }
+}
+
+async function tryPrintAltaPresentationPdf(tab) {
+  if (!Number.isInteger(tab?.id) || !chrome.debugger) {
+    return null;
+  }
+
+  const beforeTabs = await chrome.tabs.query({});
+  const beforeTabIds = new Set(beforeTabs.map((entry) => entry.id).filter(Number.isInteger));
+  const clickResult = await clickAltaDownloadPrintButton(tab.id);
+
+  if (!clickResult?.ok) {
+    return null;
+  }
+
+  const printTab = await waitForAltaPrintableTab(tab.id, beforeTabIds);
+
+  if (!printTab?.id) {
+    return null;
+  }
+
+  try {
+    const result = await printTabToPdf(printTab.id);
+    const base64 = stripPdfDataUrlPrefix(result?.data || "");
+
+    if (!isPdfBase64(base64)) {
+      return null;
+    }
+
+    const fileName = getBrowserPdfFileName("", printTab.title || tab.title || "alta-presentation");
+
+    return {
+      base64,
+      fileName,
+      metadata: {
+        fileName,
+        fileSize: base64ToByteLength(base64),
+        contentType: "application/pdf",
+        source: "browser-pdf",
+        sourceUrl: tab.url || "",
+        discoveredBy: "alta-print-tab",
+        discoveredFrom: tab.url || "",
+        foundAt: new Date().toISOString()
+      }
+    };
+  } finally {
+    await cleanupAltaPrintTabs(beforeTabIds);
+  }
+}
+
+async function clickAltaDownloadPrintButton(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: {
+        tabId
+      },
+      func: clickAltaDownloadPrintButtonInPage
+    });
+
+    return results.find((entry) => entry?.result)?.result || null;
+  } catch {
+    return null;
+  }
+}
+
+function clickAltaDownloadPrintButtonInPage() {
+  const button = Array.from(document.querySelectorAll("button, [role='button'], a"))
+    .find((element) => /Download\s*\/\s*Print/i.test(element.innerText || element.textContent || ""));
+
+  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") {
+    return {
+      ok: false,
+      error: "Download/Print button was not available."
+    };
+  }
+
+  setTimeout(() => button.click(), 0);
+
+  return {
+    ok: true
+  };
+}
+
+async function waitForAltaPrintableTab(openerTabId, beforeTabIds, timeoutMs = 8000) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const tabs = await chrome.tabs.query({});
+    const printTab = tabs.find((entry) => entry.url === "about:blank"
+      && !beforeTabIds.has(entry.id)
+      && (entry.openerTabId === openerTabId || /^Music_.*\d{8}/i.test(entry.title || "")));
+
+    if (printTab?.id && printTab.title) {
+      return printTab;
+    }
+
+    await delay(250);
+  }
+
+  return null;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function printTabToPdf(tabId) {
+  const target = {
+    tabId
+  };
+
+  await chrome.debugger.attach(target, "1.3");
+
+  try {
+    await chrome.debugger.sendCommand(target, "Page.enable");
+    return await chrome.debugger.sendCommand(target, "Page.printToPDF", {
+      printBackground: true,
+      preferCSSPageSize: true
+    });
+  } finally {
+    await chrome.debugger.detach(target).catch(() => {});
+  }
+}
+
+async function cleanupAltaPrintTabs(beforeTabIds) {
+  const tabs = await chrome.tabs.query({});
+  const cleanupTabIds = tabs
+    .filter((entry) => !beforeTabIds.has(entry.id) && (entry.url === "about:blank" || entry.url?.startsWith("chrome://print/")))
+    .map((entry) => entry.id)
+    .filter(Number.isInteger);
+
+  if (cleanupTabIds.length) {
+    await chrome.tabs.remove(cleanupTabIds).catch(() => {});
   }
 }
 
@@ -3667,7 +3854,7 @@ function collectPdfCandidatesInPage() {
   const seen = new Set();
   const pdfHintPattern = /\.pdf($|[?#])|\/pdf\/|format=pdf|contenttype=application\/pdf/i;
 
-  function add(rawUrl, source) {
+  function add(rawUrl, source, details = {}) {
     if (!rawUrl || typeof rawUrl !== "string") {
       return;
     }
@@ -3695,7 +3882,11 @@ function collectPdfCandidatesInPage() {
     }
 
     seen.add(resolved);
-    candidates.push({ url: resolved, source });
+    candidates.push({
+      url: resolved,
+      source,
+      ...details
+    });
   }
 
   function decodeURIComponentSafe(value) {
@@ -3706,15 +3897,66 @@ function collectPdfCandidatesInPage() {
     }
   }
 
+  function getVisibilityDetails(element) {
+    const emptyDetails = {
+      tagName: element?.tagName?.toLowerCase() || "",
+      visible: false,
+      inViewport: false,
+      visibleArea: 0
+    };
+
+    if (!element?.getClientRects || !element?.ownerDocument?.defaultView) {
+      return emptyDetails;
+    }
+
+    const view = element.ownerDocument.defaultView;
+    const style = view.getComputedStyle(element);
+
+    if (element.hidden || style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || Number(style.opacity) === 0) {
+      return emptyDetails;
+    }
+
+    const viewportWidth = view.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = view.innerHeight || document.documentElement.clientHeight || 0;
+    let visibleArea = 0;
+    let inViewport = false;
+
+    Array.from(element.getClientRects()).forEach((rect) => {
+      const area = Math.max(0, rect.width) * Math.max(0, rect.height);
+
+      if (!area) {
+        return;
+      }
+
+      visibleArea += area;
+
+      const overlapWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+      const overlapHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+
+      if (overlapWidth * overlapHeight > 0) {
+        inViewport = true;
+      }
+    });
+
+    return {
+      tagName: emptyDetails.tagName,
+      visible: visibleArea > 0,
+      inViewport,
+      visibleArea
+    };
+  }
+
   function collectFromRoot(root, label) {
     if (!root?.querySelectorAll) {
       return;
     }
 
     root.querySelectorAll("embed[src], iframe[src], object[data], a[href], source[src]").forEach((element) => {
-      add(element.getAttribute("src"), `${label}:src`);
-      add(element.getAttribute("href"), `${label}:href`);
-      add(element.getAttribute("data"), `${label}:data`);
+      const details = getVisibilityDetails(element);
+
+      add(element.getAttribute("src"), `${label}:src`, details);
+      add(element.getAttribute("href"), `${label}:href`, details);
+      add(element.getAttribute("data"), `${label}:data`, details);
     });
 
     root.querySelectorAll("*").forEach((element) => {
@@ -3724,12 +3966,30 @@ function collectPdfCandidatesInPage() {
     });
   }
 
-  add(location.href, "location");
+  let isTopFrame = false;
+
+  try {
+    isTopFrame = window.top === window;
+  } catch {
+    isTopFrame = false;
+  }
+
+  add(location.href, isTopFrame ? "location" : "frame-location", {
+    tagName: "document",
+    visible: isTopFrame,
+    inViewport: isTopFrame,
+    visibleArea: isTopFrame ? Number.MAX_SAFE_INTEGER : 0
+  });
   collectFromRoot(document, "dom");
 
   try {
     performance.getEntriesByType("resource").forEach((entry) => {
-      add(entry.name, "performance-resource");
+      add(entry.name, "performance-resource", {
+        tagName: "resource",
+        visible: false,
+        inViewport: false,
+        visibleArea: 0
+      });
     });
   } catch {
     // Performance entries are best-effort only.

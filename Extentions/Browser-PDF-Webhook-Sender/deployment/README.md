@@ -38,7 +38,15 @@ https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Se
 
 ## Remote Install
 
-Run this remotely as Administrator on each Windows PC:
+Send staff this page:
+
+```text
+https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Sender/
+```
+
+Chrome and Edge block true one-click extension installs from non-store web pages. The supported internal flow is to download/run the generated Windows installer as Administrator. It force-installs the signed CRX through browser policy and points it at this repo's update feed.
+
+Direct install command, run as Administrator:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -Command "irm 'https://JanielRosario.github.io/Gia-Extensions/Extentions/Browser-PDF-Webhook-Sender/install-managed-extension.ps1' | iex"
@@ -58,5 +66,9 @@ The installer writes Chrome and Edge force-install policy entries. Restart Chrom
 2. Push to `main`.
 3. The workflow publishes a new CRX and updates `update.xml`.
 4. Chrome/Edge updates managed clients automatically.
+
+For users who already have the managed extension, no reinstall link is needed; restart Chrome/Edge to pick up the published update faster. Running the same installer page again is safe and refreshes the policy entry.
+
+For users who have an unpacked developer copy, have them install from the managed installer page, then remove or disable the unpacked copy in `chrome://extensions` / `edge://extensions`.
 
 Use the same signing key every time. A different key creates a different extension ID.
