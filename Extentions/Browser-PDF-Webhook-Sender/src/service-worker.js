@@ -2917,11 +2917,52 @@ async function clickAltaDownloadPrintButton(tabId) {
   }
 }
 
-function clickAltaDownloadPrintButtonInPage() {
-  const button = Array.from(document.querySelectorAll("button, [role='button'], a"))
-    .find((element) => /Download\s*\/\s*Print/i.test(element.innerText || element.textContent || ""));
+async function clickAltaDownloadPrintButtonInPage() {
+  const findButton = (pattern) => Array.from(document.querySelectorAll("button, [role='button'], a"))
+    .find((element) => pattern.test(element.innerText || element.textContent || ""));
+  const isDisabled = (element) => !element
+    || element.disabled === true
+    || element.getAttribute("aria-disabled") === "true"
+    || /\bdisabled\b/i.test(element.className?.toString() || "");
+  const signature = () => {
+    const checked = document.querySelectorAll("input[type='checkbox']:checked, .mat-mdc-checkbox-checked").length;
+    const spinners = document.querySelectorAll("mat-spinner, mat-progress-spinner, .mat-mdc-progress-spinner, [aria-busy='true']").length;
+    const textLength = document.body?.innerText?.length || 0;
+    const apply = findButton(/Apply changes/i);
+    const print = findButton(/Download\s*\/\s*Print/i);
 
-  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") {
+    return [checked, spinners, textLength, isDisabled(apply), isDisabled(print)].join("|");
+  };
+  const waitForStablePresentation = async (timeoutMs = 10000) => {
+    const startedAt = Date.now();
+    let lastSignature = "";
+    let stableCount = 0;
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const currentSignature = signature();
+      stableCount = currentSignature === lastSignature ? stableCount + 1 : 0;
+      lastSignature = currentSignature;
+
+      if (stableCount >= 2 && !isDisabled(findButton(/Download\s*\/\s*Print/i))) {
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+
+    return false;
+  };
+  const applyButton = findButton(/Apply changes/i);
+
+  if (!isDisabled(applyButton)) {
+    applyButton.click();
+  }
+
+  await waitForStablePresentation();
+
+  const button = findButton(/Download\s*\/\s*Print/i);
+
+  if (isDisabled(button)) {
     return {
       ok: false,
       error: "Download/Print button was not available."

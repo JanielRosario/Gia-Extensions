@@ -42,9 +42,11 @@ vm.runInContext(`
   ${extractFunction("isAltaPresentationUrl")}
   ${extractFunction("delay")}
   ${extractFunction("waitForAltaPrintableTab")}
+  ${extractFunction("clickAltaDownloadPrintButtonInPage")}
   globalThis.comparePdfCandidates = comparePdfCandidates;
   globalThis.isAltaPresentationUrl = isAltaPresentationUrl;
   globalThis.waitForAltaPrintableTab = waitForAltaPrintableTab;
+  globalThis.clickAltaDownloadPrintButtonInPage = clickAltaDownloadPrintButtonInPage;
 `, sandbox);
 
 const visibleAltaPdf = {
@@ -120,6 +122,50 @@ assert.equal(sandbox.isAltaPresentationUrl("https://alta.farmers.com/quote/custo
   const printTab = await sandbox.waitForAltaPrintableTab(1, new Set([1]), 500);
 
   assert.equal(printTab.id, 2);
+
+  const buttons = [
+    {
+      innerText: "Apply changes",
+      textContent: "Apply changes",
+      disabled: false,
+      className: "apply-btn",
+      getAttribute: () => null,
+      click() {
+        this.clicked = true;
+        this.disabled = true;
+      }
+    },
+    {
+      innerText: "Download/Print",
+      textContent: "Download/Print",
+      disabled: false,
+      className: "down-print-btn",
+      getAttribute: () => null,
+      click() {
+        this.clicked = true;
+      }
+    }
+  ];
+  sandbox.document = {
+    body: {
+      innerText: "Selected quotes\nHome Quotes"
+    },
+    querySelectorAll(selector) {
+      if (selector.includes("button")) {
+        return buttons;
+      }
+
+      return [];
+    }
+  };
+
+  const clickResult = await sandbox.clickAltaDownloadPrintButtonInPage();
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(clickResult.ok, true);
+  assert.equal(buttons[0].clicked, true);
+  assert.equal(buttons[1].clicked, true);
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
