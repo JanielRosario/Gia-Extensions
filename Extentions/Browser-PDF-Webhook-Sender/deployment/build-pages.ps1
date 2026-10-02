@@ -65,6 +65,7 @@ function Copy-ExtensionRuntimeFiles {
 
   Copy-Item -LiteralPath (Join-Path $SourceDir "icons") -Destination $DestinationDir -Recurse -Force
   Copy-Item -LiteralPath (Join-Path $SourceDir "src") -Destination $DestinationDir -Recurse -Force
+  Copy-Item -LiteralPath (Join-Path $SourceDir "vendor") -Destination $DestinationDir -Recurse -Force
 }
 
 $resolvedExtensionDir = (Resolve-Path -LiteralPath $ExtensionDir).Path
