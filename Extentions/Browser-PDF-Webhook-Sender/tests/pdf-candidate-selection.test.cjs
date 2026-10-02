@@ -4,6 +4,11 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "src", "service-worker.js"), "utf8");
+const qteBridgeSource = fs.readFileSync(path.join(__dirname, "..", "src", "qte-bridge.js"), "utf8");
+const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"));
+
+assert.equal(source.includes("chrome.debugger"), false);
+assert.equal(manifest.permissions.includes("debugger"), false);
 
 function extractFunction(name) {
   let start = source.indexOf(`function ${name}`);
@@ -33,20 +38,48 @@ function extractFunction(name) {
 
 const sandbox = {
   URL,
-  setTimeout
+  setTimeout,
+  clearTimeout,
+  atob,
+  btoa
 };
 vm.createContext(sandbox);
 vm.runInContext(`
+  ${extractFunction("decodeURIComponentSafe")}
+  ${extractFunction("urlLooksLikePdfFile")}
+  ${extractFunction("sanitizeUploadedPdfFileName")}
+  ${extractFunction("getBrowserPdfFileName")}
+  ${extractFunction("stripPdfDataUrlPrefix")}
   ${extractFunction("getPdfCandidateRank")}
   ${extractFunction("comparePdfCandidates")}
+  ${extractFunction("handleActionClick")}
   ${extractFunction("isAltaPresentationUrl")}
+  ${extractFunction("isAegisUrl")}
+  ${extractFunction("isBambooUrl")}
+  ${extractFunction("isBrowserPdfReaderUrl")}
+  ${extractFunction("getBrowserPdfReaderSourceUrl")}
+  ${extractFunction("isAltaBlockedPdfCandidate")}
   ${extractFunction("delay")}
-  ${extractFunction("waitForAltaPrintableTab")}
-  ${extractFunction("clickAltaDownloadPrintButtonInPage")}
+  ${extractFunction("captureAltaPrintHtmlInPage")}
+  ${extractFunction("captureAltaQuotePdfInPage")}
+  ${extractFunction("clickAegisPrintQuoteButtonInPage")}
+  ${extractFunction("captureBambooQuotePdfInPage")}
   globalThis.comparePdfCandidates = comparePdfCandidates;
+  globalThis.urlLooksLikePdfFile = urlLooksLikePdfFile;
+  globalThis.sanitizeUploadedPdfFileName = sanitizeUploadedPdfFileName;
+  globalThis.getBrowserPdfFileName = getBrowserPdfFileName;
+  globalThis.stripPdfDataUrlPrefix = stripPdfDataUrlPrefix;
+  globalThis.handleActionClick = handleActionClick;
   globalThis.isAltaPresentationUrl = isAltaPresentationUrl;
-  globalThis.waitForAltaPrintableTab = waitForAltaPrintableTab;
-  globalThis.clickAltaDownloadPrintButtonInPage = clickAltaDownloadPrintButtonInPage;
+  globalThis.isAegisUrl = isAegisUrl;
+  globalThis.isBambooUrl = isBambooUrl;
+  globalThis.isBrowserPdfReaderUrl = isBrowserPdfReaderUrl;
+  globalThis.getBrowserPdfReaderSourceUrl = getBrowserPdfReaderSourceUrl;
+  globalThis.isAltaBlockedPdfCandidate = isAltaBlockedPdfCandidate;
+  globalThis.captureAltaPrintHtmlInPage = captureAltaPrintHtmlInPage;
+  globalThis.captureAltaQuotePdfInPage = captureAltaQuotePdfInPage;
+  globalThis.clickAegisPrintQuoteButtonInPage = clickAegisPrintQuoteButtonInPage;
+  globalThis.captureBambooQuotePdfInPage = captureBambooQuotePdfInPage;
 `, sandbox);
 
 const visibleAltaPdf = {
@@ -101,27 +134,268 @@ assert.equal(
 
 assert.equal(sandbox.isAltaPresentationUrl("https://alta.farmers.com/quote/presentation"), true);
 assert.equal(sandbox.isAltaPresentationUrl("https://alta.farmers.com/quote/customer"), false);
+assert.equal(sandbox.isBambooUrl("https://agent-access.bambooinsurance.com/Homeowners/HoQbWizardPage/quote"), true);
+assert.equal(sandbox.isBambooUrl("https://bambooinsurance.com/"), false);
+assert.equal(sandbox.isBrowserPdfReaderUrl("file:///C:/Quotes/Quote%20-%20Q1002409964.pdf"), true);
+assert.equal(sandbox.isBrowserPdfReaderUrl("https://example.com/quote.pdf"), true);
+assert.equal(sandbox.isBrowserPdfReaderUrl("chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html?src=file:///C:/Quotes/Quote.pdf"), true);
+assert.equal(sandbox.isBrowserPdfReaderUrl("https://example.com/quote.html"), false);
+assert.equal(sandbox.getBrowserPdfReaderSourceUrl("chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html?src=file:///C:/Quotes/Quote.pdf"), "file:///C:/Quotes/Quote.pdf");
+assert.equal(sandbox.getBrowserPdfFileName("chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html?src=file:///C:/Quotes/Quote%20-%20Q1002409964.pdf", "index.html"), "Quote - Q1002409964.pdf");
+assert.equal(sandbox.stripPdfDataUrlPrefix("data:application/pdf;filename=Alta.pdf;base64,JVBERi0x"), "JVBERi0x");
+assert.equal(sandbox.isAltaBlockedPdfCandidate({ url: "https://alta.example/360Value.pdf" }), true);
+assert.equal(sandbox.isAltaBlockedPdfCandidate({ url: "https://alta.example/presentation.pdf" }), false);
 
-(async () => {
-  let calls = 0;
-  sandbox.chrome = {
-    tabs: {
-      query: async () => {
-        calls += 1;
+const altaPrintHtmlCaptureCheck = (async () => {
+  let originalOpenCalled = false;
+  const button = {
+    innerText: "Download/Print",
+    textContent: "Download/Print",
+    disabled: false,
+    className: "",
+    getAttribute: () => null,
+    click() {
+      const popup = isolated.window.open("", "_blank", "top=0,left=0,height=auto,width=auto");
+      popup.document.open();
+      popup.document.write(`
+        <html>
+          <head><title>Feder_Home_10012026</title></head>
+          <body>Quote number 1790872992151629 Printable Alta quote</body>
+        </html>
+      `);
+      popup.document.close();
+    }
+  };
+  const isolated = {
+    setTimeout,
+    clearTimeout,
+    location: {
+      href: "https://alta.farmers.com/quote/presentation"
+    },
+    document: {
+      querySelectorAll(selector) {
+        return selector.includes("button") ? [button] : [];
+      }
+    },
+    window: null
+  };
 
-        return calls === 1
-          ? [{ id: 1, url: "https://alta.farmers.com/quote/presentation", title: "Alta" }]
-          : [
-            { id: 1, url: "https://alta.farmers.com/quote/presentation", title: "Alta" },
-            { id: 2, openerTabId: 1, url: "about:blank", title: "Music_Home_09302026" }
-          ];
+  isolated.window = {
+    open() {
+      originalOpenCalled = true;
+      return null;
+    }
+  };
+
+  vm.createContext(isolated);
+  vm.runInContext(`
+    ${extractFunction("captureAltaPrintHtmlInPage")}
+    globalThis.resultPromise = captureAltaPrintHtmlInPage(500);
+  `, isolated);
+  isolated.result = await isolated.resultPromise;
+
+  assert.equal(isolated.result.ok, true);
+  assert.match(isolated.result.html, /Printable Alta quote/);
+  assert.equal(isolated.result.fileName, "Farmers Home.pdf");
+  assert.equal(isolated.result.quoteNumber, "1790872992151629");
+  assert.equal(originalOpenCalled, false);
+})();
+
+const altaRenderCheck = (async () => {
+  const canvasCalls = [];
+  const imageCalls = [];
+  const dataUrlCalls = [];
+  const page = createNode();
+  const preview = createNode();
+  const previewText = `Quote number 1790872992151629 ${"coverage ".repeat(20)}`;
+
+  page.scrollWidth = 900;
+  page.offsetWidth = 900;
+  page.scrollHeight = 1200;
+  page.offsetHeight = 1200;
+  page.getBoundingClientRect = () => ({ width: 450, height: 600 });
+  preview.innerText = previewText;
+  preview.textContent = preview.innerText;
+  preview.querySelectorAll = (selector) => selector === ".a4-page" ? [page] : [];
+
+  const isolated = {
+    atob,
+    btoa,
+    setTimeout: (callback) => {
+      callback();
+      return 0;
+    },
+    location: {
+      href: "https://alta.farmers.com/quote/presentation"
+    },
+    getComputedStyle: () => ({ width: "900px", height: "1200px", minHeight: "0px" }),
+    requestAnimationFrame: (callback) => callback(),
+    document: {
+      body: {
+        append(element) {
+          this.lastChild = element;
+        }
+      },
+      querySelector: (selector) => selector === "#estimate_page_view2"
+        ? preview
+        : null,
+      querySelectorAll: () => [],
+      createElement: createNode
+    },
+    window: {
+      devicePixelRatio: 1,
+      html2canvas: async (element, options) => {
+        canvasCalls.push(options);
+        return {
+          width: options.width * options.scale,
+          height: options.height * options.scale,
+          toDataURL: (...args) => {
+            dataUrlCalls.push(args);
+            return "data:image/jpeg;base64,page";
+          }
+        };
+      },
+      jspdf: {
+        jsPDF: function MockPdf() {
+          this.addPage = () => {};
+          this.addImage = (...args) => imageCalls.push(args);
+          this.output = () => "data:application/pdf;base64,JVBERi0xLjQK";
+        }
       }
     }
   };
 
-  const printTab = await sandbox.waitForAltaPrintableTab(1, new Set([1]), 500);
+  vm.createContext(isolated);
+  vm.runInContext(`
+    ${extractFunction("captureAltaQuotePdfInPage")}
+    globalThis.resultPromise = captureAltaQuotePdfInPage();
+  `, isolated);
+  isolated.result = await isolated.resultPromise;
 
-  assert.equal(printTab.id, 2);
+  assert.equal(isolated.result.ok, true);
+  assert.equal(canvasCalls[0].width, 900);
+  assert.equal(canvasCalls[0].height, 1200);
+  assert.equal(canvasCalls[0].scale, 1.35);
+  assert.deepEqual(dataUrlCalls[0], ["image/jpeg", 0.95]);
+  assert.equal(isolated.document.body.lastChild.style.position, "fixed");
+  assert.equal(isolated.document.body.lastChild.style.left, "-100000px");
+  assert.equal(imageCalls.length, 1);
+  assert.equal(imageCalls[0][1], "JPEG");
+  assert.equal(imageCalls[0][7], "FAST");
+  assert.equal(isolated.result.base64, "JVBERi0xLjQK");
+  assert.equal(isolated.result.fileName, "Alta-1790872992151629-presentation.pdf");
+
+  function createNode() {
+    return {
+      style: {},
+      children: [],
+      innerText: "",
+      textContent: "",
+      scrollWidth: 900,
+      offsetWidth: 900,
+      scrollHeight: 1200,
+      offsetHeight: 1200,
+      append(child) {
+        this.children.push(child);
+      },
+      replaceChildren(...children) {
+        this.children = children;
+      },
+      remove() {
+        this.removed = true;
+      },
+      cloneNode() {
+        const clone = createNode();
+        clone.innerText = this.innerText;
+        clone.textContent = this.textContent;
+        clone.scrollWidth = this.scrollWidth;
+        clone.offsetWidth = this.offsetWidth;
+        clone.scrollHeight = this.scrollHeight;
+        clone.offsetHeight = this.offsetHeight;
+        clone.getBoundingClientRect = this.getBoundingClientRect;
+        clone.querySelectorAll = this.querySelectorAll;
+        return clone;
+      },
+      querySelectorAll: () => [],
+      getBoundingClientRect: () => ({ width: 900, height: 1200 })
+    };
+  }
+})();
+
+(async () => {
+  await altaPrintHtmlCaptureCheck;
+  await altaRenderCheck;
+
+  const actionCalls = [];
+  Object.assign(sandbox, {
+    cacheAltaQuoteFromOpenTab: async () => {
+      actionCalls.push("alta");
+      return { fileName: "fresh-alta.pdf" };
+    },
+    cacheAegisQuoteFromOpenTab: async () => {
+      actionCalls.push("aegis");
+      return { fileName: "fresh-aegis.pdf" };
+    },
+    cacheBambooQuoteFromOpenTab: async () => {
+      actionCalls.push("bamboo");
+      return { fileName: "fresh-bamboo.pdf" };
+    },
+    getLatestPdfMetadata: async () => {
+      actionCalls.push("stale-cache");
+      return { fileName: "old.pdf" };
+    },
+    sendBrowserPdf: async () => {
+      actionCalls.push("send-browser");
+      return { message: "sent" };
+    },
+    sendLatestPdf: async () => {
+      actionCalls.push("send-latest");
+      return { message: "sent" };
+    },
+    showPdfCaptureLoadingIndicator: async (tab) => {
+      actionCalls.push(`show:${tab.id}`);
+    },
+    hidePdfCaptureLoadingIndicator: async (tab) => {
+      actionCalls.push(`hide:${tab.id}`);
+    },
+    setActionBadge: async () => {},
+    showActionError: async (tabId, error) => {
+      actionCalls.push(`error:${tabId}:${error.message}`);
+    }
+  });
+
+  await sandbox.handleActionClick({
+    id: 9,
+    url: "https://alta.farmers.com/quote/presentation"
+  });
+
+  assert.deepEqual(actionCalls, ["show:9", "alta", "send-latest", "hide:9"]);
+  actionCalls.length = 0;
+
+  await sandbox.handleActionClick({
+    id: 10,
+    url: "https://agent-access.bambooinsurance.com/Homeowners/HoQbWizardPage/quote"
+  });
+
+  assert.deepEqual(actionCalls, ["show:10", "bamboo", "send-latest", "hide:10"]);
+  actionCalls.length = 0;
+
+  sandbox.cacheAltaQuoteFromOpenTab = async () => {
+    actionCalls.push("alta-miss");
+    return null;
+  };
+
+  await sandbox.handleActionClick({
+    id: 11,
+    url: "https://alta.farmers.com/quote/presentation"
+  });
+
+  assert.deepEqual(actionCalls, [
+    "show:11",
+    "alta-miss",
+    "error:11:Could not capture the current Alta quote PDF.",
+    "hide:11"
+  ]);
 
   const buttons = [
     {
@@ -144,29 +418,389 @@ assert.equal(sandbox.isAltaPresentationUrl("https://alta.farmers.com/quote/custo
       click() {
         this.clicked = true;
       }
+    },
+    {
+      id: "printQuotePdf",
+      innerText: "Print Quote",
+      textContent: "Print Quote",
+      disabled: false,
+      className: "",
+      getAttribute: () => null,
+      click() {
+        this.clicked = true;
+      }
+    },
+    {
+      innerText: "Print Quote Summary",
+      textContent: "Print Quote Summary",
+      disabled: false,
+      className: "print-summary",
+      getAttribute: () => null,
+      click() {
+        this.clicked = true;
+        sandbox.window.fetch("https://pc-prod-bamboo-bambooprod.api.delta4-andromeda.guidewire.net/rest/bamboo/digital/integration/v1/jobs/pc:test/generate-document-ext?docType=SubmissionQuote&draftMode=false")
+          .then(() => {
+            const anchor = new sandbox.HTMLAnchorElement();
+            anchor.download = "Quote.pdf";
+            anchor.href = "blob:https://agent-access.bambooinsurance.com/test";
+            anchor.click();
+          });
+      }
     }
   ];
+  let anchorClicked = false;
+  sandbox.HTMLAnchorElement = function MockAnchor() {};
+  sandbox.HTMLAnchorElement.prototype.click = function click() {
+    anchorClicked = true;
+  };
   sandbox.document = {
     body: {
-      innerText: "Selected quotes\nHome Quotes"
+      innerText: "Selected quotes\nHome Quotes\nQ1002409964"
     },
+    head: {},
     querySelectorAll(selector) {
       if (selector.includes("button")) {
         return buttons;
       }
 
       return [];
-    }
+    },
+    querySelector: () => null
+  };
+  sandbox.window = {
+    fetch: async (url) => ({
+      url,
+      clone() {
+        return this;
+      },
+      json: async () => ({
+        contents: "JVBERi0xLjQK",
+        responseMimeType: "application/pdf"
+      })
+    })
   };
 
-  const clickResult = await sandbox.clickAltaDownloadPrintButtonInPage();
+  const aegisClickResult = sandbox.clickAegisPrintQuoteButtonInPage();
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
-  assert.equal(clickResult.ok, true);
-  assert.equal(buttons[0].clicked, true);
-  assert.equal(buttons[1].clicked, true);
+  assert.equal(aegisClickResult.ok, true);
+  assert.equal(buttons[2].clicked, true);
+
+  const bambooResult = await sandbox.captureBambooQuotePdfInPage(500);
+
+  assert.equal(bambooResult.ok, true);
+  assert.equal(bambooResult.fileName, "Quote - Q1002409964.pdf");
+  assert.equal(bambooResult.base64, "JVBERi0xLjQK");
+  assert.equal(buttons[3].clicked, true);
+  assert.equal(anchorClicked, false);
+
+  await qteBridgeWaitsForPendingPdfCheck();
+  await qteBridgeDeliversWhenPendingPdfAppearsCheck();
+  await qteBridgeDownloadNameCheck();
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+async function qteBridgeWaitsForPendingPdfCheck() {
+  const messages = [];
+  let handler = null;
+  let pendingGets = 0;
+  const pendingPdf = {
+    filename: "ready.pdf",
+    base64: "JVBERi0xLjQK",
+    expiresAtMs: Date.now() + 60000
+  };
+  const isolated = {
+    atob,
+    Blob: function MockBlob(parts, options) {
+      this.parts = parts;
+      this.options = options;
+    },
+    chrome: {
+      runtime: {
+        sendMessage: async () => {}
+      },
+      storage: {
+        session: {
+          get: async (key) => {
+            if (key === "qteLastSentPdf") {
+              return {};
+            }
+
+            pendingGets += 1;
+            return pendingGets < 2 ? {} : { qtePendingPdf: pendingPdf };
+          },
+          remove: async () => {},
+          set: async () => {}
+        }
+      }
+    },
+    clearTimeout: () => {},
+    console,
+    Date,
+    document: {
+      body: {
+        append() {}
+      },
+      createElement: () => ({
+        addEventListener() {},
+        click() {},
+        style: {}
+      }),
+      getElementById: () => null
+    },
+    location: {
+      href: "https://quote-to-email.giatools.com/dashboard",
+      origin: "https://quote-to-email.giatools.com"
+    },
+    setTimeout: (callback) => {
+      queueMicrotask(callback);
+      return 0;
+    },
+    URL: {
+      createObjectURL: () => "blob:test",
+      revokeObjectURL() {}
+    },
+    window: {
+      addEventListener(type, callback) {
+        if (type === "message") {
+          handler = callback;
+        }
+      },
+      postMessage(message, origin) {
+        messages.push({ message, origin });
+      }
+    }
+  };
+
+  vm.createContext(isolated);
+  vm.runInContext(qteBridgeSource, isolated);
+  await handler({
+    origin: isolated.location.origin,
+    data: {
+      source: "quote-to-email",
+      type: "qte-intake-ready"
+    }
+  });
+
+  assert.equal(pendingGets >= 2, true);
+  assert.equal(messages[0].message.filename, "ready.pdf");
+  assert.equal(messages[0].message.base64, "JVBERi0xLjQK");
+}
+
+async function qteBridgeDeliversWhenPendingPdfAppearsCheck() {
+  const messages = [];
+  let storageListener = null;
+  const pendingPdf = {
+    filename: "storage-ready.pdf",
+    base64: "JVBERi0xLjQK",
+    expiresAtMs: Date.now() + 60000
+  };
+  const isolated = {
+    atob,
+    Blob: function MockBlob(parts, options) {
+      this.parts = parts;
+      this.options = options;
+    },
+    chrome: {
+      runtime: {
+        sendMessage: async () => {}
+      },
+      storage: {
+        onChanged: {
+          addListener(callback) {
+            storageListener = callback;
+          }
+        },
+        session: {
+          get: async () => ({}),
+          remove: async () => {},
+          set: async () => {}
+        }
+      }
+    },
+    clearTimeout: () => {},
+    console,
+    Date,
+    document: {
+      body: {
+        append() {}
+      },
+      createElement: () => ({
+        addEventListener() {},
+        click() {},
+        style: {}
+      }),
+      getElementById: () => null
+    },
+    location: {
+      href: "https://quote-to-email.giatools.com/dashboard",
+      origin: "https://quote-to-email.giatools.com"
+    },
+    setTimeout: (callback) => {
+      queueMicrotask(callback);
+      return 0;
+    },
+    URL: {
+      createObjectURL: () => "blob:test",
+      revokeObjectURL() {}
+    },
+    window: {
+      addEventListener() {},
+      postMessage(message, origin) {
+        messages.push({ message, origin });
+      }
+    }
+  };
+
+  vm.createContext(isolated);
+  vm.runInContext(qteBridgeSource, isolated);
+  assert.equal(typeof storageListener, "function");
+  await storageListener({
+    qtePendingPdf: {
+      newValue: pendingPdf
+    }
+  }, "session");
+
+  assert.equal(messages[0].message.filename, "storage-ready.pdf");
+  assert.equal(messages[0].message.base64, "JVBERi0xLjQK");
+}
+
+async function qteBridgeDownloadNameCheck() {
+  const bamboo = await getDownloadNameForPendingPdf({
+    filename: "Quote - Q1002409964.pdf",
+    base64: "JVBERi0xLjQK",
+    expiresAtMs: Date.now() + 60000,
+    metadata: {
+      sourceMode: "Bamboo Quote PDF"
+    }
+  });
+  const alta = await getDownloadNameForPendingPdf({
+    filename: "Farmers Home.pdf",
+    base64: "JVBERi0xLjQK",
+    expiresAtMs: Date.now() + 60000,
+    metadata: {
+      sourceMode: "Alta Quote PDF",
+      quoteNumber: "1790872992151629"
+    }
+  });
+  const gwpc = await getDownloadNameForPendingPdf({
+    filename: "Home Quote 123456789.pdf",
+    base64: "JVBERi0xLjQK",
+    expiresAtMs: Date.now() + 60000,
+    metadata: {
+      sourceMode: "GWPC Download Trigger"
+    }
+  });
+
+  assert.equal(bamboo.storedLastSent.metadata.sourceMode, "Bamboo Quote PDF");
+  assert.equal(bamboo.downloadName, "Bamboo - Q1002409964 - Quote - Q1002409964.pdf");
+  assert.equal(alta.downloadName, "Farmers - 1790872992151629 - Home.pdf");
+  assert.equal(gwpc.downloadName, "Farmers - 123456789 - Home.pdf");
+
+  async function getDownloadNameForPendingPdf(pendingPdf) {
+    let handler = null;
+    let downloadName = "";
+    let storedLastSent = null;
+    let installedButton = null;
+    const isolated = {
+      atob,
+      Blob: function MockBlob(parts, options) {
+        this.parts = parts;
+        this.options = options;
+      },
+      chrome: {
+        runtime: {
+          sendMessage: async () => {}
+        },
+        storage: {
+          session: {
+            get: async (key) => {
+              if (key === "qteLastSentPdf") {
+                return {};
+              }
+
+              return { qtePendingPdf: pendingPdf };
+            },
+            remove: async () => {},
+            set: async (value) => {
+              storedLastSent = value.qteLastSentPdf;
+            }
+          }
+        }
+      },
+      clearTimeout: () => {},
+      console,
+      Date,
+      document: {
+        body: {
+          append(element) {
+            installedButton = element;
+          }
+        },
+        createElement: (tagName) => {
+          const element = {
+            disabled: false,
+            id: "",
+            style: {},
+            type: "",
+            addEventListener(type, callback) {
+              this[`on${type}`] = callback;
+            },
+            click() {
+              this.onclick?.();
+            }
+          };
+
+          if (tagName === "a") {
+            element.click = function click() {
+              downloadName = this.download;
+            };
+          }
+
+          return element;
+        },
+        getElementById: () => null
+      },
+      location: {
+        href: "https://quote-to-email.giatools.com/dashboard",
+        origin: "https://quote-to-email.giatools.com"
+      },
+      setTimeout: (callback) => {
+        queueMicrotask(callback);
+        return 0;
+      },
+      URL: {
+        createObjectURL: () => "blob:test",
+        revokeObjectURL() {}
+      },
+      window: {
+        addEventListener(type, callback) {
+          if (type === "message") {
+            handler = callback;
+          }
+        },
+        postMessage() {}
+      }
+    };
+
+    vm.createContext(isolated);
+    vm.runInContext(qteBridgeSource, isolated);
+    await handler({
+      origin: isolated.location.origin,
+      data: {
+        source: "quote-to-email",
+        type: "qte-intake-ready"
+      }
+    });
+
+    installedButton.click();
+
+    return {
+      downloadName,
+      storedLastSent
+    };
+  }
+}

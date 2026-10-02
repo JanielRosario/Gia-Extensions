@@ -195,19 +195,47 @@ async function handleMessage(message, sender) {
 
 async function handleActionClick(tab) {
   await setActionBadge(tab?.id, "...", "#475467", "Sending PDF...");
+  await showPdfCaptureLoadingIndicator(tab).catch(() => {});
 
   try {
-    let latestPdf = Number.isInteger(tab?.id)
-      ? await getLatestPdfMetadata(tab.id)
-      : null;
+    const tabUrl = tab?.url || "";
+    let result = null;
 
-    if (!latestPdf && isAegisUrl(tab?.url || "")) {
-      latestPdf = await cacheAegisQuoteFromOpenTab(tab);
+    if (isAltaPresentationUrl(tabUrl)) {
+      const latestPdf = await cacheAltaQuoteFromOpenTab(tab);
+
+      if (!latestPdf) {
+        throw new Error("Could not capture the current Alta quote PDF.");
+      }
+
+      result = await sendLatestPdf({ tabId: tab.id });
+    } else if (isAegisUrl(tabUrl)) {
+      const latestPdf = await cacheAegisQuoteFromOpenTab(tab);
+
+      if (!latestPdf) {
+        throw new Error("Could not capture the current Aegis quote PDF.");
+      }
+
+      result = await sendLatestPdf({ tabId: tab.id });
+    } else if (isBambooUrl(tabUrl)) {
+      const latestPdf = await cacheBambooQuoteFromOpenTab(tab);
+
+      if (!latestPdf) {
+        throw new Error("Could not capture the current Bamboo quote PDF.");
+      }
+
+      result = await sendLatestPdf({ tabId: tab.id });
     }
 
-    const result = latestPdf
-      ? await sendLatestPdf({ tabId: tab.id })
-      : await sendBrowserPdf(tab);
+    if (!result) {
+      const latestPdf = Number.isInteger(tab?.id)
+        ? await getLatestPdfMetadata(tab.id)
+        : null;
+
+      result = latestPdf
+        ? await sendLatestPdf({ tabId: tab.id })
+        : await sendBrowserPdf(tab);
+    }
 
     await setActionBadge(tab?.id, "OK", "#0f766e", result.message || "PDF sent.");
   } catch (error) {
@@ -218,6 +246,8 @@ async function handleActionClick(tab) {
     }
 
     await showActionError(tab?.id, error);
+  } finally {
+    await hidePdfCaptureLoadingIndicator(tab).catch(() => {});
   }
 }
 
@@ -303,6 +333,22 @@ async function getLatestPdfMetadata(tabId = null) {
   }
 
   return stored[LATEST_PDF_METADATA_KEY];
+}
+
+async function waitForLatestPdfMetadata(tabId, timeoutMs = 5000) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const metadata = await getLatestPdfMetadata(tabId);
+
+    if (metadata) {
+      return metadata;
+    }
+
+    await delay(250);
+  }
+
+  return null;
 }
 
 async function getLatestPdfCache(options = {}) {
@@ -837,7 +883,15 @@ async function cacheAegisQuoteFromOpenTab(tab) {
     return null;
   }
 
-  const candidates = await collectAegisQuoteIframeCandidates(tab.id);
+  let candidates = await collectAegisQuoteIframeCandidates(tab.id);
+
+  if (!candidates.length) {
+    const clickResult = await clickAegisPrintQuoteButton(tab.id);
+
+    if (clickResult?.ok) {
+      candidates = await waitForAegisQuoteIframeCandidates(tab.id);
+    }
+  }
 
   if (!candidates.length) {
     await logDiagnostic("Aegis quote iframe detected", "Toolbar click scanned Aegis tab, but no quote PDF iframe was found.", {
@@ -869,6 +923,226 @@ async function cacheAegisQuoteFromOpenTab(tab) {
   }
 
   return null;
+}
+
+async function cacheAltaQuoteFromOpenTab(tab) {
+  if (!Number.isInteger(tab?.id)) {
+    return null;
+  }
+
+  await clearLatestPdfForTabIds([tab.id]);
+
+  let capture = null;
+  let printCapture = null;
+  const timings = {
+    startedAt: Date.now()
+  };
+  const rendererStartedAt = Date.now();
+  const rendererReadyPromise = ensureAltaRendererLibraries(tab.id).then(() => {
+    timings.rendererReadyMs = Date.now() - rendererStartedAt;
+  });
+
+  try {
+    const printStartedAt = Date.now();
+    const printResults = await chrome.scripting.executeScript({
+      target: {
+        tabId: tab.id
+      },
+      world: "MAIN",
+      func: captureAltaPrintHtmlInPage,
+      args: [8000]
+    });
+
+    printCapture = printResults?.[0]?.result || null;
+    timings.printCaptureMs = Date.now() - printStartedAt;
+  } catch (error) {
+    await logDiagnostic("Alta print HTML capture", error.message || "Could not capture Alta print HTML.", {
+      source: "alta-print-html",
+      tabId: tab.id
+    });
+  }
+
+  try {
+    await rendererReadyPromise;
+
+    const renderStartedAt = Date.now();
+    const results = await chrome.scripting.executeScript({
+      target: {
+        tabId: tab.id
+      },
+      func: captureAltaQuotePdfInPage,
+      args: [printCapture?.ok ? printCapture : null]
+    });
+
+    capture = results?.[0]?.result || null;
+    timings.renderMs = Date.now() - renderStartedAt;
+  } catch (error) {
+    await logDiagnostic("exact error message if failed", error.message || "Could not render Alta quote PDF.", {
+      source: "alta-preview-render",
+      tabId: tab.id
+    });
+  }
+
+  if (!capture?.ok || !capture.base64) {
+    await logDiagnostic("Alta quote PDF capture", capture?.error || "Could not render Alta visible quote preview.", {
+      captured: false,
+      tabId: tab.id,
+      url: redactLongUrl(tab.url || "")
+    });
+    return null;
+  }
+
+  const fileName = sanitizeUploadedPdfFileName(capture.fileName || "Alta-presentation.pdf");
+  const metadata = await saveLatestPdfCache({
+    base64: capture.base64,
+    fileName,
+    metadata: {
+      fileName,
+      fileSize: capture.byteLength || base64ToByteLength(capture.base64),
+      contentType: "application/pdf",
+      quoteNumber: capture.quoteNumber || "",
+      source: capture.source || "alta-visible-preview",
+      sourceMode: "Alta Quote PDF",
+      sourceUrl: capture.sourceUrl || tab.url || "",
+      discoveredBy: capture.discoveredBy || "alta-preview-render",
+      foundAt: new Date().toISOString(),
+      capturedAt: new Date().toISOString()
+    }
+  }, {
+    tabId: tab.id
+  });
+
+  await logDiagnostic("response body captured yes/no", capture.message || "Alta quote PDF rendered.", {
+    source: capture.discoveredBy || "alta-preview-render",
+      bodyCaptured: true,
+      byteLength: metadata.fileSize,
+      fileName: metadata.fileName,
+      pageCount: capture.pageCount || null,
+      timings: {
+        ...timings,
+        totalMs: Date.now() - timings.startedAt
+      }
+    });
+
+  return metadata;
+}
+
+async function ensureAltaRendererLibraries(tabId) {
+  const ready = await chrome.scripting.executeScript({
+    target: {
+      tabId
+    },
+    func: () => Boolean(window.html2canvas && window.jspdf?.jsPDF)
+  });
+
+  if (ready?.[0]?.result) {
+    return;
+  }
+
+  await chrome.scripting.executeScript({
+    target: {
+      tabId
+    },
+    files: [
+      "vendor/html2canvas.min.js",
+      "vendor/jspdf.umd.min.js"
+    ]
+  });
+}
+
+async function cacheBambooQuoteFromOpenTab(tab) {
+  if (!Number.isInteger(tab?.id)) {
+    return null;
+  }
+
+  let capture = null;
+
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: {
+        tabId: tab.id
+      },
+      world: "MAIN",
+      func: captureBambooQuotePdfInPage,
+      args: [20000]
+    });
+
+    capture = results?.[0]?.result || null;
+  } catch (error) {
+    await logDiagnostic("exact error message if failed", error.message || "Could not run Bamboo quote PDF capture.", {
+      source: "bamboo-toolbar-capture",
+      tabId: tab.id
+    });
+  }
+
+  if (!capture?.ok || !capture.base64) {
+    await logDiagnostic("Bamboo quote PDF capture", capture?.error || "Toolbar click could not capture Bamboo quote PDF.", {
+      captured: false,
+      tabId: tab.id,
+      url: redactLongUrl(tab.url || "")
+    });
+    return null;
+  }
+
+  const fileName = sanitizeUploadedPdfFileName(capture.fileName || "Bamboo-quote.pdf");
+  const metadata = await saveLatestPdfCache({
+    base64: capture.base64,
+    fileName,
+    metadata: {
+      fileName,
+      fileSize: capture.byteLength || base64ToByteLength(capture.base64),
+      contentType: "application/pdf",
+      source: "bamboo-quote-summary",
+      sourceMode: "Bamboo Quote PDF",
+      sourceUrl: capture.sourceUrl || tab.url || "",
+      discoveredBy: "bamboo-toolbar-capture",
+      foundAt: new Date().toISOString(),
+      capturedAt: new Date().toISOString()
+    }
+  }, {
+    tabId: tab.id
+  });
+
+  await logDiagnostic("response body captured yes/no", "Bamboo quote PDF response body captured before download.", {
+    source: "bamboo-toolbar-capture",
+    bodyCaptured: true,
+    byteLength: metadata.fileSize,
+    fileName: metadata.fileName
+  });
+
+  return metadata;
+}
+
+async function clickAegisPrintQuoteButton(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: {
+        tabId,
+        allFrames: true
+      },
+      func: clickAegisPrintQuoteButtonInPage
+    });
+
+    return results.find((entry) => entry?.result?.ok)?.result || null;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForAegisQuoteIframeCandidates(tabId, timeoutMs = 8000) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const candidates = await collectAegisQuoteIframeCandidates(tabId);
+
+    if (candidates.length) {
+      return candidates;
+    }
+
+    await delay(250);
+  }
+
+  return [];
 }
 
 async function collectAegisQuoteIframeCandidates(tabId) {
@@ -2745,11 +3019,18 @@ async function findBrowserPdf(tab) {
     return directPdf;
   }
 
-  if (isAltaPresentationUrl(tab.url || "")) {
-    const altaPdf = await tryPrintAltaPresentationPdf(tab);
+  if (isBrowserPdfReaderUrl(tab.url || "")) {
+    const sourceUrl = getBrowserPdfReaderSourceUrl(tab.url || "");
+    const readerPdf = sourceUrl && sourceUrl !== tab.url
+      ? await tryReadPdfFromUrl(sourceUrl, {
+        title: tab.title,
+        source: "pdf-viewer-src",
+        discoveredFrom: tab.url
+      })
+      : null;
 
-    if (altaPdf) {
-      return altaPdf;
+    if (readerPdf) {
+      return readerPdf;
     }
   }
 
@@ -2794,6 +3075,10 @@ async function discoverPdfCandidates(tab) {
 
     for (const candidate of candidates) {
       if (!candidate?.url) {
+        continue;
+      }
+
+      if (isAltaPresentationUrl(tab.url || "") && isAltaBlockedPdfCandidate(candidate)) {
         continue;
       }
 
@@ -2854,179 +3139,53 @@ function isAltaPresentationUrl(url = "") {
   }
 }
 
-async function tryPrintAltaPresentationPdf(tab) {
-  if (!Number.isInteger(tab?.id) || !chrome.debugger) {
-    return null;
-  }
+function isAltaBlockedPdfCandidate(candidate = {}) {
+  const value = decodeURIComponentSafe([
+    candidate.url || "",
+    candidate.source || "",
+    candidate.tagName || ""
+  ].join(" ")).toLowerCase();
 
-  const beforeTabs = await chrome.tabs.query({});
-  const beforeTabIds = new Set(beforeTabs.map((entry) => entry.id).filter(Number.isInteger));
-  const clickResult = await clickAltaDownloadPrintButton(tab.id);
-
-  if (!clickResult?.ok) {
-    return null;
-  }
-
-  const printTab = await waitForAltaPrintableTab(tab.id, beforeTabIds);
-
-  if (!printTab?.id) {
-    return null;
-  }
-
-  try {
-    const result = await printTabToPdf(printTab.id);
-    const base64 = stripPdfDataUrlPrefix(result?.data || "");
-
-    if (!isPdfBase64(base64)) {
-      return null;
-    }
-
-    const fileName = getBrowserPdfFileName("", printTab.title || tab.title || "alta-presentation");
-
-    return {
-      base64,
-      fileName,
-      metadata: {
-        fileName,
-        fileSize: base64ToByteLength(base64),
-        contentType: "application/pdf",
-        source: "browser-pdf",
-        sourceUrl: tab.url || "",
-        discoveredBy: "alta-print-tab",
-        discoveredFrom: tab.url || "",
-        foundAt: new Date().toISOString()
-      }
-    };
-  } finally {
-    await cleanupAltaPrintTabs(beforeTabIds);
-  }
+  return /360\s*value|360value|valuation|reconstruction/.test(value);
 }
 
-async function clickAltaDownloadPrintButton(tabId) {
-  try {
-    const results = await chrome.scripting.executeScript({
-      target: {
-        tabId
-      },
-      func: clickAltaDownloadPrintButtonInPage
-    });
+function isBrowserPdfReaderUrl(url = "") {
+  if (url.startsWith("data:application/pdf")) {
+    return true;
+  }
 
-    return results.find((entry) => entry?.result)?.result || null;
+  if (urlLooksLikePdfFile(url)) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const viewerSource = parsed.searchParams.get("src") || "";
+
+    return parsed.protocol === "chrome-extension:"
+      && parsed.pathname.endsWith("/index.html")
+      && (viewerSource.startsWith("file:") || urlLooksLikePdfFile(viewerSource));
   } catch {
-    return null;
-  }
-}
-
-async function clickAltaDownloadPrintButtonInPage() {
-  const findButton = (pattern) => Array.from(document.querySelectorAll("button, [role='button'], a"))
-    .find((element) => pattern.test(element.innerText || element.textContent || ""));
-  const isDisabled = (element) => !element
-    || element.disabled === true
-    || element.getAttribute("aria-disabled") === "true"
-    || /\bdisabled\b/i.test(element.className?.toString() || "");
-  const signature = () => {
-    const checked = document.querySelectorAll("input[type='checkbox']:checked, .mat-mdc-checkbox-checked").length;
-    const spinners = document.querySelectorAll("mat-spinner, mat-progress-spinner, .mat-mdc-progress-spinner, [aria-busy='true']").length;
-    const textLength = document.body?.innerText?.length || 0;
-    const apply = findButton(/Apply changes/i);
-    const print = findButton(/Download\s*\/\s*Print/i);
-
-    return [checked, spinners, textLength, isDisabled(apply), isDisabled(print)].join("|");
-  };
-  const waitForStablePresentation = async (timeoutMs = 10000) => {
-    const startedAt = Date.now();
-    let lastSignature = "";
-    let stableCount = 0;
-
-    while (Date.now() - startedAt < timeoutMs) {
-      const currentSignature = signature();
-      stableCount = currentSignature === lastSignature ? stableCount + 1 : 0;
-      lastSignature = currentSignature;
-
-      if (stableCount >= 2 && !isDisabled(findButton(/Download\s*\/\s*Print/i))) {
-        return true;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 350));
-    }
-
     return false;
-  };
-  const applyButton = findButton(/Apply changes/i);
-
-  if (!isDisabled(applyButton)) {
-    applyButton.click();
   }
-
-  await waitForStablePresentation();
-
-  const button = findButton(/Download\s*\/\s*Print/i);
-
-  if (isDisabled(button)) {
-    return {
-      ok: false,
-      error: "Download/Print button was not available."
-    };
-  }
-
-  setTimeout(() => button.click(), 0);
-
-  return {
-    ok: true
-  };
 }
 
-async function waitForAltaPrintableTab(openerTabId, beforeTabIds, timeoutMs = 8000) {
-  const startedAt = Date.now();
+function getBrowserPdfReaderSourceUrl(url = "") {
+  try {
+    const parsed = new URL(url);
 
-  while (Date.now() - startedAt < timeoutMs) {
-    const tabs = await chrome.tabs.query({});
-    const printTab = tabs.find((entry) => entry.url === "about:blank"
-      && !beforeTabIds.has(entry.id)
-      && (entry.openerTabId === openerTabId || /^Music_.*\d{8}/i.test(entry.title || "")));
-
-    if (printTab?.id && printTab.title) {
-      return printTab;
+    if (parsed.protocol === "chrome-extension:" && parsed.pathname.endsWith("/index.html")) {
+      return parsed.searchParams.get("src") || "";
     }
-
-    await delay(250);
+  } catch {
+    return "";
   }
 
-  return null;
+  return "";
 }
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function printTabToPdf(tabId) {
-  const target = {
-    tabId
-  };
-
-  await chrome.debugger.attach(target, "1.3");
-
-  try {
-    await chrome.debugger.sendCommand(target, "Page.enable");
-    return await chrome.debugger.sendCommand(target, "Page.printToPDF", {
-      printBackground: true,
-      preferCSSPageSize: true
-    });
-  } finally {
-    await chrome.debugger.detach(target).catch(() => {});
-  }
-}
-
-async function cleanupAltaPrintTabs(beforeTabIds) {
-  const tabs = await chrome.tabs.query({});
-  const cleanupTabIds = tabs
-    .filter((entry) => !beforeTabIds.has(entry.id) && (entry.url === "about:blank" || entry.url?.startsWith("chrome://print/")))
-    .map((entry) => entry.id)
-    .filter(Number.isInteger);
-
-  if (cleanupTabIds.length) {
-    await chrome.tabs.remove(cleanupTabIds).catch(() => {});
-  }
 }
 
 async function tryReadPdfFromUrl(url, context = {}) {
@@ -3233,7 +3392,7 @@ async function sendPdfToQuoteToEmailApp(pdf) {
 
   await logDiagnostic("Quote-to-Email app opened", "PDF saved for Quote-to-Email postMessage handoff.", {
     appUrl: QTE_APP_URL,
-    appTabId: tab.id,
+    appTabId: tab?.id || null,
     fileName: filename,
     byteLength: base64ToByteLength(base64),
     expiresAt: new Date(expiresAtMs).toISOString()
@@ -3275,7 +3434,7 @@ async function expireQtePendingPdf() {
 }
 
 function stripPdfDataUrlPrefix(base64 = "") {
-  return `${base64}`.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+  return `${base64}`.replace(/^data:application\/pdf(?:;[^,]*)?;base64,/i, "").replace(/\s+/g, "");
 }
 
 async function setActionBadge(tabId, text, color, title, options = {}) {
@@ -3309,6 +3468,85 @@ async function showActionError(tabId, error) {
 
   console.error(message);
   await setActionBadge(tabId, "ERR", "#b42318", message);
+}
+
+async function showPdfCaptureLoadingIndicator(tab) {
+  if (!Number.isInteger(tab?.id)) {
+    return;
+  }
+
+  await chrome.scripting.executeScript({
+    target: {
+      tabId: tab.id
+    },
+    func: showPdfCaptureLoadingIndicatorInPage
+  });
+}
+
+async function hidePdfCaptureLoadingIndicator(tab) {
+  if (!Number.isInteger(tab?.id)) {
+    return;
+  }
+
+  await chrome.scripting.executeScript({
+    target: {
+      tabId: tab.id
+    },
+    func: hidePdfCaptureLoadingIndicatorInPage
+  });
+}
+
+function showPdfCaptureLoadingIndicatorInPage() {
+  const id = "gia-pdf-webhook-loading";
+  document.getElementById(id)?.remove();
+
+  const container = document.createElement("div");
+  const spinner = document.createElement("div");
+  const label = document.createElement("span");
+
+  container.id = id;
+  container.setAttribute("role", "status");
+  container.setAttribute("aria-live", "polite");
+  Object.assign(container.style, {
+    alignItems: "center",
+    background: "rgba(15, 23, 42, 0.94)",
+    borderRadius: "999px",
+    boxShadow: "0 10px 30px rgba(15, 23, 42, 0.22)",
+    color: "#ffffff",
+    display: "flex",
+    font: "600 13px Arial, sans-serif",
+    gap: "10px",
+    padding: "10px 14px",
+    pointerEvents: "none",
+    position: "fixed",
+    right: "18px",
+    top: "18px",
+    zIndex: "2147483647"
+  });
+
+  Object.assign(spinner.style, {
+    border: "3px solid rgba(255,255,255,0.35)",
+    borderTopColor: "#ffffff",
+    borderRadius: "50%",
+    boxSizing: "border-box",
+    height: "18px",
+    width: "18px"
+  });
+  spinner.animate?.([
+    { transform: "rotate(0deg)" },
+    { transform: "rotate(360deg)" }
+  ], {
+    duration: 800,
+    iterations: Infinity
+  });
+
+  label.textContent = "Preparing PDF...";
+  container.append(spinner, label);
+  (document.body || document.documentElement).append(container);
+}
+
+function hidePdfCaptureLoadingIndicatorInPage() {
+  document.getElementById("gia-pdf-webhook-loading")?.remove();
 }
 
 async function sendMultipart(webhookUrl, pagePdf) {
@@ -3808,6 +4046,901 @@ function collectAegisQuoteIframeUrlsInPage() {
   return {
     candidates
   };
+}
+
+function clickAegisPrintQuoteButtonInPage() {
+  const controls = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], a, [role='button']"));
+  const button = controls.find((element) => {
+    const label = [
+      element.id || "",
+      element.name || "",
+      element.value || "",
+      element.getAttribute("aria-label") || "",
+      element.getAttribute("title") || "",
+      element.innerText || element.textContent || ""
+    ].join(" ");
+
+    return /\bprint\s+quote\b/i.test(label);
+  });
+
+  if (!button || button.disabled === true || button.getAttribute("aria-disabled") === "true" || /\bdisabled\b/i.test(button.className?.toString() || "")) {
+    return {
+      ok: false,
+      error: "Print Quote button was not available."
+    };
+  }
+
+  setTimeout(() => button.click(), 0);
+
+  return {
+    ok: true
+  };
+}
+
+function captureAltaPrintHtmlInPage(timeoutMs = 8000) {
+  const originalOpen = window.open;
+  let restored = false;
+
+  function restore() {
+    if (restored) {
+      return;
+    }
+
+    restored = true;
+    window.open = originalOpen;
+  }
+
+  function findDownloadPrintButton() {
+    return Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], a, [role='button']"))
+      .find((element) => {
+        const label = [
+          element.id || "",
+          element.name || "",
+          element.value || "",
+          element.getAttribute("aria-label") || "",
+          element.getAttribute("title") || "",
+          element.innerText || element.textContent || ""
+        ].join(" ");
+
+        return /\bdownload\s*\/\s*print\b/i.test(label);
+      });
+  }
+
+  function getTitleFromHtml(html) {
+    return (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getFileNameFromTitle(title) {
+    const clean = String(title || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/[<>:"/\\|?*\x00-\x1f]+/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\.pdf$/i, "");
+    const productWords = clean
+      .split(" ")
+      .filter(Boolean)
+      .slice(1)
+      .filter((word) => !/^\d{6,}$/.test(word));
+
+    return productWords.length ? `Farmers ${productWords.join(" ")}.pdf` : "Farmers Quote.pdf";
+  }
+
+  function getQuoteNumberFromHtml(html) {
+    const text = String(html || "").replace(/<[^>]+>/g, " ");
+
+    return text.match(/Quote\s+(?:number|#)\s*(\d+)/i)?.[1]
+      || text.match(/\b(\d{12,})\b/)?.[1]
+      || "";
+  }
+
+  return new Promise((resolve) => {
+    const chunks = [];
+    let done = false;
+    let timer = null;
+    let settleTimer = null;
+
+    function finish(result) {
+      if (done) {
+        return;
+      }
+
+      done = true;
+      clearTimeout(timer);
+      clearTimeout(settleTimer);
+      restore();
+      resolve(result);
+    }
+
+    function succeedIfReady() {
+      const html = chunks.join("");
+
+      if (html.length < 100 || !/(?:<html\b|<body\b|app-new-create-estimate|estimate_page_view)/i.test(html)) {
+        return false;
+      }
+
+      const title = getTitleFromHtml(html);
+
+      finish({
+        ok: true,
+        html,
+        title,
+        fileName: getFileNameFromTitle(title),
+        quoteNumber: getQuoteNumberFromHtml(html),
+        sourceUrl: location.href
+      });
+      return true;
+    }
+
+    function scheduleSettle() {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        if (!succeedIfReady()) {
+          finish({
+            ok: false,
+            error: "Alta Download/Print did not produce printable HTML."
+          });
+        }
+      }, 50);
+    }
+
+    window.open = function patchedOpen(url) {
+      const popupDocument = {
+        open() {
+          chunks.length = 0;
+          return popupDocument;
+        },
+        write(value) {
+          chunks.push(String(value || ""));
+          scheduleSettle();
+        },
+        writeln(value) {
+          chunks.push(String(value || ""), "\n");
+          scheduleSettle();
+        },
+        close() {
+          scheduleSettle();
+        }
+      };
+
+      return {
+        document: popupDocument,
+        location: {
+          href: url || ""
+        },
+        closed: false,
+        focus() {},
+        print() {},
+        close() {
+          this.closed = true;
+        },
+        addEventListener(type, handler) {
+          if (type === "load" && typeof handler === "function") {
+            setTimeout(() => handler.call(this, { type: "load" }), 0);
+          }
+        },
+        removeEventListener() {}
+      };
+    };
+
+    timer = setTimeout(() => {
+      finish({
+        ok: false,
+        error: "Timed out waiting for Alta printable HTML."
+      });
+    }, timeoutMs);
+
+    const button = findDownloadPrintButton();
+
+    if (!button || button.disabled === true || button.getAttribute("aria-disabled") === "true" || /\bdisabled\b/i.test(button.className?.toString() || "")) {
+      finish({
+        ok: false,
+        error: "Download/Print button was not available."
+      });
+      return;
+    }
+
+    try {
+      button.click();
+    } catch (error) {
+      finish({
+        ok: false,
+        error: error.message || "Could not click Alta Download/Print."
+      });
+    }
+  });
+}
+
+async function captureAltaQuotePdfInPage(printCapture = null) {
+  const htmlToCanvas = window.html2canvas;
+  const JsPdf = window.jspdf?.jsPDF;
+  const printableHtml = typeof printCapture?.html === "string" && printCapture.html.trim().length > 100
+    ? printCapture.html
+    : "";
+  const pageWidthPt = 612;
+  const pageHeightPt = 792;
+  const scale = 1.35;
+  const imageType = "JPEG";
+  const imageQuality = 0.95;
+
+  if (!htmlToCanvas || !JsPdf) {
+    return {
+      ok: false,
+      error: "Alta PDF renderer libraries were not available."
+    };
+  }
+
+  let printRenderError = "";
+
+  if (printableHtml) {
+    const printResult = await renderAltaPrintableHtml(printCapture);
+
+    if (printResult.ok) {
+      return printResult;
+    }
+
+    printRenderError = printResult.error || "";
+  }
+
+  const preview = document.querySelector("#estimate_page_view2");
+
+  if (!preview) {
+    return {
+      ok: false,
+      error: printRenderError || "Alta visible preview was not found."
+    };
+  }
+
+  const ready = await waitForAltaPreviewReady(preview);
+
+  if (!ready.ok) {
+    return ready;
+  }
+
+  const sourcePages = Array.from(preview.querySelectorAll(".a4-page"));
+  const pages = sourcePages.length ? sourcePages : [preview];
+  const quoteNumber = getAltaQuoteNumberFromText(preview.innerText || preview.textContent || "");
+  const renderRoot = document.createElement("div");
+  const renderedPages = [];
+
+  renderRoot.id = "pdf-webhook-alta-render-root";
+  Object.assign(renderRoot.style, {
+    position: "fixed",
+    left: "-100000px",
+    top: "0",
+    width: "auto",
+    height: "auto",
+    overflow: "visible",
+    pointerEvents: "none",
+    background: "#fff",
+    zIndex: "-2147483647"
+  });
+  document.body.append(renderRoot);
+
+  try {
+    for (const page of pages) {
+      const size = measurePage(page);
+      const wrapper = preview.cloneNode(false);
+      const clone = page.cloneNode(true);
+
+      Object.assign(wrapper.style, {
+        transform: "none",
+        zoom: "1",
+        overflow: "visible",
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        maxHeight: "none",
+        background: "#fff"
+      });
+      Object.assign(clone.style, {
+        transform: "none",
+        zoom: "1",
+        margin: "0",
+        position: "relative",
+        left: "0",
+        top: "0",
+        width: `${size.width}px`,
+        minWidth: `${size.width}px`,
+        maxWidth: "none",
+        height: `${size.height}px`,
+        minHeight: `${size.height}px`,
+        maxHeight: "none",
+        overflow: "visible",
+        boxShadow: "none",
+        background: "#fff"
+      });
+
+      wrapper.append(clone);
+      renderRoot.replaceChildren(wrapper);
+      await waitForAltaRenderAssets(clone);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      const renderSize = measurePage(clone);
+      const width = Math.max(size.width, renderSize.width);
+      const height = Math.max(size.height, renderSize.height);
+
+      Object.assign(wrapper.style, {
+        width: `${width}px`,
+        height: `${height}px`
+      });
+      Object.assign(clone.style, {
+        width: `${width}px`,
+        minWidth: `${width}px`,
+        height: `${height}px`,
+        minHeight: `${height}px`
+      });
+
+      const canvas = await htmlToCanvas(clone, {
+        backgroundColor: "#ffffff",
+        scale,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width,
+        height,
+        windowWidth: width,
+        windowHeight: height,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      renderedPages.push({
+        dataUrl: canvas.toDataURL("image/jpeg", imageQuality),
+        width: canvas.width,
+        height: canvas.height
+      });
+    }
+
+    if (!renderedPages.length) {
+      return {
+        ok: false,
+        error: "Alta visible preview did not contain any pages."
+      };
+    }
+
+    const firstHeightPt = getPageHeightPt(renderedPages[0]);
+    const pdf = new JsPdf({
+      orientation: "portrait",
+      unit: "pt",
+      format: [pageWidthPt, firstHeightPt],
+      compress: true
+    });
+
+    renderedPages.forEach((page, index) => {
+      const pageHeightPt = getPageHeightPt(page);
+
+      if (index > 0) {
+        pdf.addPage([pageWidthPt, pageHeightPt], "portrait");
+      }
+
+      pdf.addImage(page.dataUrl, imageType, 0, 0, pageWidthPt, pageHeightPt, undefined, "FAST");
+    });
+
+    const base64 = stripDataUrlPrefix(pdf.output("datauristring"));
+
+    return {
+      ok: true,
+      base64,
+      byteLength: base64ByteLength(base64),
+      pageCount: renderedPages.length,
+      fileName: quoteNumber ? `Alta-${quoteNumber}-presentation.pdf` : "Alta-presentation.pdf",
+      quoteNumber,
+      sourceUrl: location.href,
+      source: "alta-visible-preview",
+      discoveredBy: "alta-preview-render",
+      message: "Alta quote PDF rendered from the visible preview."
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message || "Could not render Alta visible preview PDF."
+    };
+  } finally {
+    renderRoot.remove();
+  }
+
+  async function renderAltaPrintableHtml(capture) {
+    const frame = document.createElement("iframe");
+
+    Object.assign(frame.style, {
+      position: "fixed",
+      left: "-100000px",
+      top: "0",
+      width: "970px",
+      height: "1400px",
+      border: "0",
+      overflow: "visible",
+      pointerEvents: "none",
+      background: "#fff",
+      zIndex: "-2147483647"
+    });
+    document.body.append(frame);
+
+    try {
+      await waitForAltaFrameLoad(frame, normalizeAltaPrintableHtml(capture.html));
+
+      const frameDocument = frame.contentDocument;
+      const root = frameDocument?.querySelector("#estimate_page_view")
+        || frameDocument?.querySelector("app-new-create-estimate")
+        || frameDocument?.body;
+
+      if (!root) {
+        return {
+          ok: false,
+          error: "Alta printable HTML did not contain a renderable document."
+        };
+      }
+
+      await waitForAltaRenderAssets(root);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      const size = measurePage(root);
+      const width = Math.max(1, size.width);
+      const height = Math.max(1, size.height);
+
+      Object.assign(frame.style, {
+        width: `${width}px`,
+        height: `${height}px`
+      });
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      const canvas = await htmlToCanvas(root, {
+        backgroundColor: "#ffffff",
+        scale,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width,
+        height,
+        windowWidth: width,
+        windowHeight: height,
+        scrollX: 0,
+        scrollY: 0
+      });
+      const renderedPages = splitCanvasIntoLetterPages(canvas);
+
+      if (!renderedPages.length) {
+        return {
+          ok: false,
+          error: "Alta printable HTML did not render any pages."
+        };
+      }
+
+      const pdf = new JsPdf({
+        orientation: "portrait",
+        unit: "pt",
+        format: [pageWidthPt, pageHeightPt],
+        compress: true
+      });
+
+      renderedPages.forEach((page, index) => {
+        if (index > 0) {
+          pdf.addPage([pageWidthPt, pageHeightPt], "portrait");
+        }
+
+        pdf.addImage(page.dataUrl, imageType, 0, 0, pageWidthPt, Math.min(pageHeightPt, getPageHeightPt(page)), undefined, "FAST");
+      });
+
+      const base64 = stripDataUrlPrefix(pdf.output("datauristring"));
+      const quoteNumber = capture.quoteNumber || getAltaQuoteNumberFromText(root.innerText || root.textContent || capture.html || "");
+
+      return {
+        ok: true,
+        base64,
+        byteLength: base64ByteLength(base64),
+        pageCount: renderedPages.length,
+        fileName: capture.fileName || getAltaPrintableFileName(capture.title) || "Alta-presentation.pdf",
+        quoteNumber,
+        sourceUrl: capture.sourceUrl || location.href,
+        source: "alta-print-html",
+        discoveredBy: "alta-print-html",
+        message: "Alta quote PDF rendered from Alta Download/Print HTML."
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || "Could not render Alta printable HTML PDF."
+      };
+    } finally {
+      frame.remove();
+    }
+  }
+
+  function normalizeAltaPrintableHtml(html) {
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+
+    parsed.querySelectorAll("script").forEach((script) => script.remove());
+
+    const base = parsed.querySelector("base") || parsed.createElement("base");
+    base.setAttribute("href", new URL(base.getAttribute("href") || "/quote/", location.origin).href);
+
+    if (!base.parentElement) {
+      (parsed.head || parsed.documentElement).prepend(base);
+    }
+
+    return `<!doctype html>${parsed.documentElement.outerHTML}`;
+  }
+
+  function splitCanvasIntoLetterPages(canvas) {
+    const pageHeight = Math.max(1, Math.round(canvas.width * 11 / 8.5));
+    const pages = [];
+
+    for (let offset = 0; offset < canvas.height; offset += pageHeight) {
+      const sliceHeight = Math.min(pageHeight, canvas.height - offset);
+      const pageCanvas = document.createElement("canvas");
+      const context = pageCanvas.getContext("2d");
+
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceHeight;
+      context.drawImage(canvas, 0, offset, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+      pages.push({
+        dataUrl: pageCanvas.toDataURL("image/jpeg", imageQuality),
+        width: pageCanvas.width,
+        height: pageCanvas.height
+      });
+    }
+
+    return pages;
+  }
+
+  function getAltaPrintableFileName(title) {
+    const clean = String(title || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/[<>:"/\\|?*\x00-\x1f]+/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\.pdf$/i, "");
+    const productWords = clean
+      .split(" ")
+      .filter(Boolean)
+      .slice(1)
+      .filter((word) => !/^\d{6,}$/.test(word));
+
+    return productWords.length ? `Farmers ${productWords.join(" ")}.pdf` : "";
+  }
+
+  function getAltaQuoteNumberFromText(text) {
+    return String(text || "").match(/Quote\s+(?:number|#)\s*(\d+)/i)?.[1]
+      || String(text || "").match(/\b(\d{12,})\b/)?.[1]
+      || "";
+  }
+
+  async function waitForAltaFrameLoad(frame, html) {
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) {
+          return;
+        }
+
+        done = true;
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(finish, 600);
+
+      frame.addEventListener("load", finish, { once: true });
+      frame.srcdoc = html;
+    });
+  }
+
+  function measurePage(page) {
+    const rect = page.getBoundingClientRect();
+    const styleRoot = page.ownerDocument?.defaultView || window;
+    const styles = styleRoot.getComputedStyle ? styleRoot.getComputedStyle(page) : getComputedStyle(page);
+    const width = Math.max(
+      1,
+      Math.round(page.scrollWidth || 0),
+      Math.round(page.offsetWidth || 0),
+      Math.round(parseFloat(styles.width) || 0),
+      Math.round(rect.width || 0),
+      794
+    );
+    const height = Math.max(
+      1,
+      Math.round(page.scrollHeight || 0),
+      Math.round(page.offsetHeight || 0),
+      Math.round(parseFloat(styles.height) || 0),
+      Math.round(parseFloat(styles.minHeight) || 0),
+      Math.round(rect.height || 0),
+      1123
+    );
+
+    return {
+      width,
+      height
+    };
+  }
+
+  async function waitForAltaPreviewReady(element, timeoutMs = 15000) {
+    const startedAt = Date.now();
+    let previous = "";
+    let stableCount = 0;
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const currentPages = Array.from(element.querySelectorAll(".a4-page"));
+      const measuredPages = currentPages.length ? currentPages : [element];
+      const pageSizes = measuredPages.map(measurePage);
+      const busyCount = document.querySelectorAll?.("mat-spinner, mat-progress-spinner, .mat-mdc-progress-spinner, [aria-busy='true']").length || 0;
+      const pendingImages = Array.from(element.querySelectorAll?.("img") || []).filter((image) => !image.complete).length;
+      const textLength = (element.innerText || element.textContent || "").trim().length;
+      const totalHeight = pageSizes.reduce((sum, size) => sum + size.height, 0);
+      const signature = JSON.stringify({
+        count: measuredPages.length,
+        sizes: pageSizes,
+        textLength,
+        pendingImages,
+        busyCount
+      });
+
+      if (signature === previous) {
+        stableCount += 1;
+      } else {
+        stableCount = 0;
+        previous = signature;
+      }
+
+      if (stableCount >= 2 && busyCount === 0 && pendingImages === 0 && textLength > 100 && totalHeight > measuredPages.length * 700) {
+        return {
+          ok: true
+        };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    return {
+      ok: false,
+      error: "Alta visible preview did not finish rendering."
+    };
+  }
+
+  async function waitForAltaRenderAssets(element) {
+    const ownerDocument = element.ownerDocument || document;
+
+    if (ownerDocument.fonts?.ready) {
+      await Promise.race([
+        ownerDocument.fonts.ready.catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 400))
+      ]);
+    }
+
+    const images = Array.from(element.querySelectorAll?.("img") || []).filter((image) => !image.complete);
+
+    if (images.length) {
+      await Promise.race([
+        Promise.all(images.map((image) => new Promise((resolve) => {
+          if (!image.addEventListener) {
+            resolve();
+            return;
+          }
+
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", resolve, { once: true });
+        }))),
+        new Promise((resolve) => setTimeout(resolve, 1500))
+      ]);
+    }
+  }
+
+  function getPageHeightPt(page) {
+    return Math.max(1, Math.round(pageWidthPt * page.height / Math.max(1, page.width)));
+  }
+
+  function stripDataUrlPrefix(value) {
+    return String(value || "").replace(/^data:application\/pdf(?:;[^,]*)?,/i, "");
+  }
+
+  function base64ByteLength(base64) {
+    const clean = base64.replace(/\s+/g, "");
+    const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+
+    return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+  }
+}
+
+function captureBambooQuotePdfInPage(timeoutMs = 20000) {
+  const pdfEndpointPattern = /\/generate-document-ext\b.*(?:\?|&)docType=SubmissionQuote\b/i;
+  const globalRoot = typeof globalThis !== "undefined" ? globalThis : null;
+  const root = (typeof window !== "undefined" && window)
+    || globalRoot
+    || (typeof self !== "undefined" && self)
+    || {};
+  const fetchOwner = root.fetch
+    ? root
+    : globalRoot?.fetch
+      ? globalRoot
+      : null;
+  const originalFetch = fetchOwner?.fetch || null;
+  const originalXhrOpen = typeof XMLHttpRequest !== "undefined" ? XMLHttpRequest.prototype.open : null;
+  const originalXhrSend = typeof XMLHttpRequest !== "undefined" ? XMLHttpRequest.prototype.send : null;
+  const originalAnchorClick = typeof HTMLAnchorElement !== "undefined"
+    ? HTMLAnchorElement.prototype.click
+    : null;
+  let restored = false;
+
+  function restore() {
+    if (restored) {
+      return;
+    }
+
+    restored = true;
+
+    if (originalFetch) {
+      fetchOwner.fetch = originalFetch;
+    }
+
+    if (originalXhrOpen && originalXhrSend) {
+      XMLHttpRequest.prototype.open = originalXhrOpen;
+      XMLHttpRequest.prototype.send = originalXhrSend;
+    }
+
+    if (originalAnchorClick) {
+      HTMLAnchorElement.prototype.click = originalAnchorClick;
+    }
+  }
+
+  function getRequestUrl(input) {
+    if (typeof input === "string") {
+      return input;
+    }
+
+    return input?.url || "";
+  }
+
+  function getQuoteNumber() {
+    const match = (document.body?.innerText || "").match(/\bQ\d{6,}\b/i);
+    return match?.[0] || "";
+  }
+
+  function normalizePdfJson(payload, sourceUrl = "") {
+    const base64 = `${payload?.contents || ""}`.replace(/\s+/g, "");
+    const mimeType = `${payload?.responseMimeType || ""}`.toLowerCase();
+
+    if (!base64.startsWith("JVBER") || !mimeType.includes("application/pdf")) {
+      return null;
+    }
+
+    const quoteNumber = getQuoteNumber();
+
+    return {
+      ok: true,
+      base64,
+      byteLength: Math.floor((base64.length * 3) / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0),
+      fileName: quoteNumber ? `Quote - ${quoteNumber}.pdf` : "Bamboo-quote.pdf",
+      sourceUrl
+    };
+  }
+
+  function findPrintQuoteButton() {
+    return Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], a, [role='button']"))
+      .find((element) => {
+        const label = [
+          element.id || "",
+          element.name || "",
+          element.value || "",
+          element.getAttribute("aria-label") || "",
+          element.getAttribute("title") || "",
+          element.innerText || element.textContent || ""
+        ].join(" ");
+
+        return /\bprint\s+quote\s+summary\b/i.test(label);
+      });
+  }
+
+  return new Promise((resolve) => {
+    let done = false;
+
+    function finish(result) {
+      if (done) {
+        return;
+      }
+
+      done = true;
+      setTimeout(() => {
+        restore();
+        resolve(result);
+      }, result?.ok ? 800 : 0);
+    }
+
+    const timer = setTimeout(() => {
+      finish({
+        ok: false,
+        error: "Timed out waiting for Bamboo quote PDF response."
+      });
+    }, timeoutMs);
+
+    function succeed(result) {
+      clearTimeout(timer);
+      finish(result);
+    }
+
+    if (!originalFetch && (!originalXhrOpen || !originalXhrSend)) {
+      finish({
+        ok: false,
+        error: "Bamboo page request APIs were not available."
+      });
+      return;
+    }
+
+    if (originalFetch) {
+      fetchOwner.fetch = async function patchedFetch(input, init) {
+        const response = await originalFetch.apply(this, arguments);
+        const url = getRequestUrl(input);
+
+        if (pdfEndpointPattern.test(url)) {
+          try {
+            const result = normalizePdfJson(await response.clone().json(), response.url || url);
+
+            if (result) {
+              succeed(result);
+            }
+          } catch {
+            // Let Bamboo keep its normal response handling.
+          }
+        }
+
+        return response;
+      };
+    }
+
+    if (originalXhrOpen && originalXhrSend) {
+      XMLHttpRequest.prototype.open = function patchedOpen(method, url) {
+        this.__pdfWebhookBambooUrl = getRequestUrl(url);
+        return originalXhrOpen.apply(this, arguments);
+      };
+
+      XMLHttpRequest.prototype.send = function patchedSend() {
+        const requestUrl = this.__pdfWebhookBambooUrl || "";
+
+        if (pdfEndpointPattern.test(requestUrl)) {
+          this.addEventListener("load", () => {
+            try {
+              const payload = this.responseType === "json"
+                ? this.response
+                : JSON.parse(typeof this.response === "string" ? this.response : this.responseText || "{}");
+              const result = normalizePdfJson(payload, this.responseURL || requestUrl);
+
+              if (result) {
+                succeed(result);
+              }
+            } catch {
+              // Let Bamboo keep its normal response handling.
+            }
+          });
+        }
+
+        return originalXhrSend.apply(this, arguments);
+      };
+    }
+
+    if (originalAnchorClick) {
+      HTMLAnchorElement.prototype.click = function patchedAnchorClick() {
+        const href = `${this.href || ""}`;
+
+        if (this.download || /^blob:|^data:application\/pdf/i.test(href)) {
+          return;
+        }
+
+        return originalAnchorClick.apply(this, arguments);
+      };
+    }
+
+    const button = findPrintQuoteButton();
+
+    if (!button || button.disabled === true || button.getAttribute("aria-disabled") === "true" || /\bdisabled\b/i.test(button.className?.toString() || "")) {
+      finish({
+        ok: false,
+        error: "Print Quote Summary button was not available."
+      });
+      return;
+    }
+
+    setTimeout(() => button.click(), 0);
+  });
 }
 
 async function readAegisQuotePdfInPage(url) {
@@ -4419,6 +5552,16 @@ function isAegisUrl(url = "") {
   }
 }
 
+function isBambooUrl(url = "") {
+  try {
+    const parsed = new URL(url);
+
+    return parsed.hostname === "agent-access.bambooinsurance.com";
+  } catch {
+    return false;
+  }
+}
+
 function isWatchedNetworkTab(state, tabId) {
   return Number.isInteger(tabId)
     && (state?.tabId === tabId || (state?.attachedTabIds || []).includes(tabId));
@@ -4537,6 +5680,16 @@ function getBrowserPdfFileName(url, title = "") {
 
   try {
     const parsed = new URL(url);
+    const viewerSource = parsed.searchParams.get("src") || "";
+
+    if (viewerSource) {
+      const sourceFileName = getBrowserPdfFileName(viewerSource, "");
+
+      if (sourceFileName !== "document.pdf") {
+        return sourceFileName;
+      }
+    }
+
     const pathName = decodeURIComponent(parsed.pathname.split("/").filter(Boolean).pop() || "");
 
     if (pathName && pathName.toLowerCase().endsWith(".pdf")) {
