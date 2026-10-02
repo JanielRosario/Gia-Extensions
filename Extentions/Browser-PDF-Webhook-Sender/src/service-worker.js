@@ -3381,12 +3381,10 @@ async function sendPdfToQuoteToEmailApp(pdf, sourceTabId = null) {
 
   await setQteBadges([sourceId], "...", "#475467", "Sending to Quote-to-Email…");
 
-  const pending = await updateQtePendingPdfs((list) => ({ result: list }));
-  const tab = await findQteTargetTab(pending);
   const expiresAtMs = Date.now() + QTE_PENDING_PDF_TIMEOUT_MS;
   const entry = {
     handoffId: crypto.randomUUID(),
-    targetTabId: tab.id,
+    targetTabId: null,
     sourceTabId: sourceId,
     filename,
     base64,
@@ -3398,10 +3396,15 @@ async function sendPdfToQuoteToEmailApp(pdf, sourceTabId = null) {
       deliveredBy: "qte-extension-bridge"
     }
   };
+  let tab = null;
   let dropped = [];
 
   try {
-    dropped = await updateQtePendingPdfs((list) => {
+    // Pick the tab and append in one queued task, so a double-click cannot open two tabs.
+    dropped = await updateQtePendingPdfs(async (list) => {
+      tab = await findQteTargetTab(list);
+      entry.targetTabId = tab.id;
+
       const next = [...list, entry];
 
       return {
@@ -3410,6 +3413,10 @@ async function sendPdfToQuoteToEmailApp(pdf, sourceTabId = null) {
       };
     });
   } catch (error) {
+    if (!tab) {
+      throw error;
+    }
+
     const message = "Quote-to-Email handoff failed: browser storage is full. Wait for the open PDFs to finish, then try again.";
 
     await logDiagnostic("Quote-to-Email handoff failed", error?.message || message, {
@@ -3466,7 +3473,7 @@ function updateQtePendingPdfs(task) {
   const run = qtePendingPdfsQueue.then(async () => {
     const stored = await chrome.storage.session.get(QTE_PENDING_PDFS_KEY);
     const list = Array.isArray(stored[QTE_PENDING_PDFS_KEY]) ? stored[QTE_PENDING_PDFS_KEY] : [];
-    const { next, result } = task(list);
+    const { next, result } = await task(list);
 
     if (next) {
       await chrome.storage.session.set({ [QTE_PENDING_PDFS_KEY]: next });
@@ -3494,7 +3501,7 @@ async function findQteTargetTab(pending) {
   if (newest) {
     const tab = await chrome.tabs.get(newest.targetTabId).catch(() => null);
 
-    if ((tab?.pendingUrl || tab?.url || "").startsWith(`${QTE_APP_ORIGIN}/`)) {
+    if (isQteIntakeUrl(tab?.pendingUrl || tab?.url)) {
       return tab;
     }
   }
@@ -3521,6 +3528,17 @@ async function findQteTargetTab(pending) {
   });
 }
 
+// Login page (the dashboard follows after sign-in) or the dashboard itself, where the intake hook runs.
+function isQteIntakeUrl(url = "") {
+  try {
+    const { origin, pathname } = new URL(url);
+
+    return origin === QTE_APP_ORIGIN && (pathname === "/" || pathname.startsWith("/dashboard"));
+  } catch {
+    return false;
+  }
+}
+
 async function handleQteReady(message, sender) {
   const tabId = sender?.tab?.id;
   const exclude = Array.isArray(message.exclude) ? message.exclude : [];
@@ -3544,8 +3562,13 @@ async function handleQtePendingPdfDelivered(message, sender) {
   const entry = await updateQtePendingPdfs((list) => {
     const match = list.find((item) => item.handoffId === message.handoffId);
 
+    // Also drop other waiting copies of the same PDF for this tab (e.g. an earlier FAILED send);
+    // the app would only ack them as duplicates, or load them again after a reload.
     return match
-      ? { next: list.filter((item) => item !== match), result: match }
+      ? {
+        next: list.filter((item) => item !== match && !(item.targetTabId === match.targetTabId && item.base64 === match.base64)),
+        result: match
+      }
       : { result: null };
   });
 

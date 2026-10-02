@@ -39,6 +39,7 @@ const PDF_BASE64 = "JVBERi0xLjQK".repeat(20);
 const QTE_FUNCTIONS = [
   "updateQtePendingPdfs",
   "findQteTargetTab",
+  "isQteIntakeUrl",
   "sendPdfToQuoteToEmailApp",
   "handleQteReady",
   "handleQtePendingPdfDelivered",
@@ -132,6 +133,7 @@ function createHarness() {
   };
   const sandbox = {
     chrome,
+    URL,
     crypto: webcrypto,
     console,
     isPdfBase64: (base64) => base64.startsWith("JVBER"),
@@ -187,7 +189,7 @@ function makeEntry(handoffId, targetTabId, sourceTabId, expiresInMs = 60000) {
     targetTabId,
     sourceTabId,
     filename: `${handoffId}.pdf`,
-    base64: PDF_BASE64,
+    base64: `${PDF_BASE64}${handoffId}`,
     expiresAtMs: Date.now() + expiresInMs
   };
 }
@@ -467,6 +469,50 @@ async function actionClickBadgeCheck() {
   assert.deepEqual(harness.calls, ["badge:7:...", "badge:7:OK"]);
 }
 
+// 13. Two sends that overlap (toolbar double-click) pick one target tab, not two new tabs.
+async function concurrentSendsCheck() {
+  const harness = createHarness();
+
+  await Promise.all([harness.send(42), harness.send(42)]);
+
+  assert.equal(harness.calls.filter((call) => call.startsWith("tabs.create")).length, 1);
+  assert.deepEqual(harness.pending().map((entry) => entry.targetTabId), [500, 500]);
+}
+
+// 14. The previous target is reused only on the login page or the dashboard.
+async function reuseRouteCheck() {
+  for (const [url, reused] of [
+    [`${APP_ORIGIN}/?redirect=%2Fdashboard`, true],
+    [`${DASHBOARD_URL}?step=send`, true],
+    [`${APP_ORIGIN}/settings`, false],
+    [`${APP_ORIGIN}/history`, false]
+  ]) {
+    const harness = createHarness();
+
+    harness.addTab({ id: 1, url });
+    harness.setPending([makeEntry("A", 1, 42)]);
+    await harness.send(42);
+
+    assert.equal(harness.pending()[1].targetTabId, reused ? 1 : 500, url);
+  }
+}
+
+// 15. DELIVERED also drops waiting copies of the same PDF for the same tab (e.g. an earlier FAILED one).
+async function deliveredDropsSamePdfCheck() {
+  const harness = createHarness();
+  const samePdf = (entry) => ({ ...entry, base64: PDF_BASE64 });
+
+  harness.setPending([
+    samePdf(makeEntry("A", 1, 42)),
+    samePdf(makeEntry("B", 1, 42)),
+    makeEntry("C", 1, 42),
+    samePdf(makeEntry("D", 2, 43))
+  ]);
+  await harness.sandbox.handleQtePendingPdfDelivered({ handoffId: "B" }, { tab: { id: 1 } });
+
+  assert.deepEqual(harness.pending().map((entry) => entry.handoffId), ["C", "D"]);
+}
+
 // 11. Source-level guards.
 function sourceCheck() {
   const handleMessageSource = extractFunction("handleMessage");
@@ -492,6 +538,9 @@ function sourceCheck() {
   await tabRemovedCheck();
   sourceCheck();
   await actionClickBadgeCheck();
+  await concurrentSendsCheck();
+  await reuseRouteCheck();
+  await deliveredDropsSamePdfCheck();
   console.log("qte-worker tests passed");
 })().catch((error) => {
   console.error(error);
