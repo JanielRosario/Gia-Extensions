@@ -10,9 +10,12 @@ const DEFAULT_SETTINGS = {
 
 const ALARM_NAME = "sync-remote-config";
 const QTE_APP_URL = "https://quote-to-email.giatools.com/dashboard";
-const QTE_PENDING_PDF_KEY = "qtePendingPdf";
+const QTE_APP_ORIGIN = "https://quote-to-email.giatools.com";
+const QTE_DASHBOARD_URL_PATTERN = "https://quote-to-email.giatools.com/dashboard*";
+const QTE_PENDING_PDFS_KEY = "qtePendingPdfs";
 const QTE_PENDING_PDF_ALARM_NAME = "qte-pending-pdf-timeout";
-const QTE_PENDING_PDF_TIMEOUT_MS = 120000;
+const QTE_PENDING_PDF_TIMEOUT_MS = 15 * 60 * 1000;
+const QTE_MAX_PENDING_PDFS = 5;
 const BADGE_RESET_MS = 4500;
 const MAX_PDF_CANDIDATES = 25;
 const DOWNLOAD_CAPTURE_TTL_MS = 90000;
@@ -24,6 +27,7 @@ const FORM_SUBMIT_CAPTURE_TTL_MS = 120000;
 const MAX_REPLAY_BODY_BYTES = 5 * 1024 * 1024;
 const policyCenterReplayRequests = new Map();
 const policyCenterFormSubmits = new Map();
+let qtePendingPdfsQueue = Promise.resolve();
 const NETWORK_CAPTURE_STATE_KEY = "networkPdfCaptureState";
 const NETWORK_CAPTURE_LOG_KEY = "networkPdfCaptureLog";
 const LATEST_PDF_METADATA_KEY = "latestPdfMetadata";
@@ -45,8 +49,6 @@ const POLICYCENTER_URL_FILTERS = [
   "https://policycenter-2.farmersinsurance.com/*",
   "https://policycenter-3.farmersinsurance.com/*"
 ];
-
-enableQteSessionStorageAccess().catch(() => {});
 
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
@@ -123,6 +125,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   handleWatchedTabRemoved(tabId).catch(() => {});
   clearLatestPdfForTabIds([tabId]).catch(() => {});
+  handleQteTabRemoved(tabId).catch(() => {});
 });
 
 chrome.action.onClicked.addListener((tab) => {
@@ -174,8 +177,12 @@ async function handleMessage(message, sender) {
       return handleGwpcFormSubmitCaptured(message, sender);
     case "AEGIS_QUOTE_IFRAME_DETECTED":
       return handleAegisQuoteIframeDetected(message, sender);
+    case "QTE_READY":
+      return handleQteReady(message, sender);
     case "QTE_PENDING_PDF_DELIVERED":
       return handleQtePendingPdfDelivered(message, sender);
+    case "QTE_PENDING_PDF_FAILED":
+      return handleQtePendingPdfFailed(message, sender);
     case "CAPTURED_PDF_FROM_PAGE":
       return sendCapturedPdfFromPage(message.file || {}, sender);
     case "PDF_CANDIDATE_FROM_PAGE":
@@ -237,7 +244,9 @@ async function handleActionClick(tab) {
         : await sendBrowserPdf(tab);
     }
 
-    await setActionBadge(tab?.id, "OK", "#0f766e", result.message || "PDF sent.");
+    if (!result.webAppOpened) {
+      await setActionBadge(tab?.id, "OK", "#0f766e", result.message || "PDF sent.");
+    }
   } catch (error) {
     if ((error?.message || "").includes("Add a webhook URL")) {
       await setActionBadge(tab?.id, "SET", "#b54708", "Add a webhook URL in settings.");
@@ -258,16 +267,6 @@ async function getStoredSettings() {
     ...DEFAULT_SETTINGS,
     ...stored
   };
-}
-
-async function enableQteSessionStorageAccess() {
-  if (!chrome.storage.session?.setAccessLevel) {
-    return;
-  }
-
-  await chrome.storage.session.setAccessLevel({
-    accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS"
-  });
 }
 
 async function getEffectiveSettings() {
@@ -739,7 +738,7 @@ async function sendBrowserPdf(tabOverride = null) {
   const delivery = await deliverPdf(settings, {
     ...browserPdf,
     metadata
-  });
+  }, tab.id);
   await logDiagnostic("webhook sent yes/no", "Current PDF manual delivery succeeded.", {
     webhookSent: delivery.webhookSent,
     webAppOpened: delivery.webAppOpened,
@@ -752,6 +751,7 @@ async function sendBrowserPdf(tabOverride = null) {
   return {
     ok: true,
     message: delivery.message,
+    webAppOpened: delivery.webAppOpened,
     latestPdf: metadata
   };
 }
@@ -768,9 +768,10 @@ async function sendLatestPdf(message = {}) {
 
   validateDeliverySettings(settings);
 
+  const sourceTabId = Number.isInteger(message.tabId) ? message.tabId : tab?.id;
   const cached = await getLatestPdfCache({
     cacheId: message.cacheId || "",
-    tabId: Number.isInteger(message.tabId) ? message.tabId : tab?.id
+    tabId: sourceTabId
   });
 
   if (!cached?.base64 || !cached?.metadata) {
@@ -792,7 +793,7 @@ async function sendLatestPdf(message = {}) {
     throw new Error("Cached latest PDF is not valid. Clear it and load the PDF again.");
   }
 
-  const delivery = await deliverPdf(settings, pdf);
+  const delivery = await deliverPdf(settings, pdf, sourceTabId);
   await logDiagnostic("webhook sent yes/no", "Latest cached PDF manual delivery succeeded.", {
     webhookSent: delivery.webhookSent,
     webAppOpened: delivery.webAppOpened,
@@ -806,6 +807,7 @@ async function sendLatestPdf(message = {}) {
   return {
     ok: true,
     message: delivery.message,
+    webAppOpened: delivery.webAppOpened,
     latestPdf: cached.metadata
   };
 }
@@ -2944,13 +2946,17 @@ async function sendCapturedPdfFromPage(file, sender) {
 
   const capturedPdf = normalizeCapturedBrowserPdf(file);
 
-  const delivery = await deliverPdf(settings, capturedPdf);
+  const delivery = await deliverPdf(settings, capturedPdf, sender.tab?.id);
   await clearDownloadCaptureSession();
-  await setActionBadge(sender.tab.id, "OK", "#0f766e", delivery.message);
+
+  if (!delivery.webAppOpened) {
+    await setActionBadge(sender.tab.id, "OK", "#0f766e", delivery.message);
+  }
 
   return {
     ok: true,
-    message: delivery.message
+    message: delivery.message,
+    webAppOpened: delivery.webAppOpened
   };
 }
 
@@ -2978,13 +2984,17 @@ async function sendPdfCandidateFromPage(candidate, sender) {
     throw new Error("The captured download link did not return a readable PDF.");
   }
 
-  const delivery = await deliverPdf(settings, pdf);
+  const delivery = await deliverPdf(settings, pdf, sender.tab?.id);
   await clearDownloadCaptureSession();
-  await setActionBadge(sender.tab.id, "OK", "#0f766e", delivery.message);
+
+  if (!delivery.webAppOpened) {
+    await setActionBadge(sender.tab.id, "OK", "#0f766e", delivery.message);
+  }
 
   return {
     ok: true,
-    message: delivery.message
+    message: delivery.message,
+    webAppOpened: delivery.webAppOpened
   };
 }
 
@@ -3005,7 +3015,8 @@ async function sendUploadedPdf(file) {
 
   return {
     ok: true,
-    message: delivery.message
+    message: delivery.message,
+    webAppOpened: delivery.webAppOpened
   };
 }
 
@@ -3334,7 +3345,7 @@ async function sendPdfToWebhook(settings, pdf) {
   await sendMultipart(settings.webhookUrl, pdf);
 }
 
-async function deliverPdf(settings, pdf) {
+async function deliverPdf(settings, pdf, sourceTabId = null) {
   const deliveryMode = normalizeDeliveryMode(settings.deliveryMode);
   const shouldOpenWebApp = deliveryMode === "webApp" || deliveryMode === "both";
   const shouldPostWebhook = deliveryMode === "webhook" || deliveryMode === "both";
@@ -3345,7 +3356,7 @@ async function deliverPdf(settings, pdf) {
   };
 
   if (shouldOpenWebApp) {
-    await sendPdfToQuoteToEmailApp(pdf);
+    await sendPdfToQuoteToEmailApp(pdf, sourceTabId);
     result.webAppOpened = true;
   }
 
@@ -3358,7 +3369,7 @@ async function deliverPdf(settings, pdf) {
   return result;
 }
 
-async function sendPdfToQuoteToEmailApp(pdf) {
+async function sendPdfToQuoteToEmailApp(pdf, sourceTabId = null) {
   const base64 = stripPdfDataUrlPrefix(pdf.base64 || "");
 
   if (!isPdfBase64(base64)) {
@@ -3366,48 +3377,208 @@ async function sendPdfToQuoteToEmailApp(pdf) {
   }
 
   const filename = sanitizeUploadedPdfFileName(pdf.fileName || pdf.metadata?.fileName || "quote.pdf");
-  const expiresAtMs = Date.now() + QTE_PENDING_PDF_TIMEOUT_MS;
+  const sourceId = Number.isInteger(sourceTabId) ? sourceTabId : null;
 
-  await enableQteSessionStorageAccess();
-  await chrome.storage.session.set({
-    [QTE_PENDING_PDF_KEY]: {
-      filename,
-      base64,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(expiresAtMs).toISOString(),
-      expiresAtMs,
-      metadata: {
-        ...(pdf.metadata || {}),
-        deliveredBy: "qte-extension-bridge"
+  await setQteBadges([sourceId], "...", "#475467", "Sending to Quote-to-Email…");
+
+  const pending = await updateQtePendingPdfs((list) => ({ result: list }));
+  const tab = await findQteTargetTab(pending);
+  const expiresAtMs = Date.now() + QTE_PENDING_PDF_TIMEOUT_MS;
+  const entry = {
+    handoffId: crypto.randomUUID(),
+    targetTabId: tab.id,
+    sourceTabId: sourceId,
+    filename,
+    base64,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    expiresAtMs,
+    metadata: {
+      ...(pdf.metadata || {}),
+      deliveredBy: "qte-extension-bridge"
+    }
+  };
+  let dropped = [];
+
+  try {
+    dropped = await updateQtePendingPdfs((list) => {
+      const next = [...list, entry];
+
+      return {
+        next: next.slice(-QTE_MAX_PENDING_PDFS),
+        result: next.slice(0, -QTE_MAX_PENDING_PDFS)
+      };
+    });
+  } catch (error) {
+    const message = "Quote-to-Email handoff failed: browser storage is full. Wait for the open PDFs to finish, then try again.";
+
+    await logDiagnostic("Quote-to-Email handoff failed", error?.message || message, {
+      fileName: filename,
+      byteLength: base64ToByteLength(base64)
+    }).catch(() => {});
+    await setQteBadges([sourceId], "ERR", "#b42318", message);
+    throw new Error(message);
+  }
+
+  if (dropped.length) {
+    await logDiagnostic("Quote-to-Email queue full", "Oldest pending Quote-to-Email PDFs were dropped.", {
+      handoffIds: dropped.map((item) => item.handoffId),
+      fileNames: dropped.map((item) => item.filename)
+    });
+
+    for (const item of dropped) {
+      if (Number.isInteger(item.sourceTabId) && item.sourceTabId !== sourceId) {
+        await clearActionBadge(item.sourceTabId).catch(() => {});
       }
     }
-  });
-  await chrome.alarms.create(QTE_PENDING_PDF_ALARM_NAME, {
-    when: expiresAtMs
-  });
-  const tab = await chrome.tabs.create({
-    url: QTE_APP_URL,
-    active: true
-  });
+  }
 
-  await logDiagnostic("Quote-to-Email app opened", "PDF saved for Quote-to-Email postMessage handoff.", {
+  // Store first, then activate and ping, so a ready from the tab always finds the entry.
+  try {
+    await chrome.tabs.update(tab.id, { active: true });
+  } catch {
+    // Tab may have closed; the expiry and tab-close rules clean up the entry.
+  }
+
+  try {
+    await chrome.windows.update(tab.windowId, { focused: true });
+  } catch {
+    // Window focus is best effort.
+  }
+
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "QTE_PING" });
+  } catch {
+    // A fresh tab has no bridge yet; its post-login ready burst covers it.
+  }
+
+  await logDiagnostic("Quote-to-Email app opened", "PDF queued for the Quote-to-Email tab.", {
     appUrl: QTE_APP_URL,
-    appTabId: tab?.id || null,
+    appTabId: tab.id,
+    handoffId: entry.handoffId,
     fileName: filename,
     byteLength: base64ToByteLength(base64),
-    expiresAt: new Date(expiresAtMs).toISOString()
+    expiresAt: entry.expiresAt
   });
 }
 
+function updateQtePendingPdfs(task) {
+  const run = qtePendingPdfsQueue.then(async () => {
+    const stored = await chrome.storage.session.get(QTE_PENDING_PDFS_KEY);
+    const list = Array.isArray(stored[QTE_PENDING_PDFS_KEY]) ? stored[QTE_PENDING_PDFS_KEY] : [];
+    const { next, result } = task(list);
+
+    if (next) {
+      await chrome.storage.session.set({ [QTE_PENDING_PDFS_KEY]: next });
+
+      if (next.length) {
+        await chrome.alarms.create(QTE_PENDING_PDF_ALARM_NAME, {
+          when: Math.min(...next.map((item) => item.expiresAtMs))
+        });
+      } else {
+        await chrome.alarms.clear(QTE_PENDING_PDF_ALARM_NAME);
+      }
+    }
+
+    return result;
+  });
+
+  qtePendingPdfsQueue = run.catch(() => {});
+  return run;
+}
+
+async function findQteTargetTab(pending) {
+  const now = Date.now();
+  const newest = pending.findLast((item) => item.expiresAtMs > now);
+
+  if (newest) {
+    const tab = await chrome.tabs.get(newest.targetTabId).catch(() => null);
+
+    if ((tab?.pendingUrl || tab?.url || "").startsWith(`${QTE_APP_ORIGIN}/`)) {
+      return tab;
+    }
+  }
+
+  const tabs = (await chrome.tabs.query({ url: QTE_DASHBOARD_URL_PATTERN }))
+    .filter((tab) => !tab.discarded)
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0) || Number(Boolean(b.active)) - Number(Boolean(a.active)));
+
+  for (const tab of tabs) {
+    try {
+      const reply = await chrome.tabs.sendMessage(tab.id, { type: "QTE_PROBE" });
+
+      if (reply?.ok) {
+        return tab;
+      }
+    } catch {
+      // No live bridge (tab opened before this version, or still loading).
+    }
+  }
+
+  return chrome.tabs.create({
+    url: QTE_APP_URL,
+    active: true
+  });
+}
+
+async function handleQteReady(message, sender) {
+  const tabId = sender?.tab?.id;
+  const exclude = Array.isArray(message.exclude) ? message.exclude : [];
+  const pending = await updateQtePendingPdfs((list) => {
+    const now = Date.now();
+
+    return {
+      result: list.find((item) => (
+        item.targetTabId === tabId && item.expiresAtMs > now && !exclude.includes(item.handoffId)
+      )) || null
+    };
+  });
+
+  return {
+    ok: true,
+    pending
+  };
+}
+
 async function handleQtePendingPdfDelivered(message, sender) {
-  await chrome.alarms.clear(QTE_PENDING_PDF_ALARM_NAME);
-  await logDiagnostic("Quote-to-Email PDF delivered", "Quote-to-Email bridge sent the PDF to the dashboard.", {
+  const entry = await updateQtePendingPdfs((list) => {
+    const match = list.find((item) => item.handoffId === message.handoffId);
+
+    return match
+      ? { next: list.filter((item) => item !== match), result: match }
+      : { result: null };
+  });
+
+  await logDiagnostic("Quote-to-Email PDF delivered", "Quote-to-Email dashboard accepted the PDF.", {
+    handoffId: message.handoffId || "",
     filename: message.filename || "",
     appUrl: redactLongUrl(message.appUrl || sender?.tab?.url || ""),
     tabId: sender?.tab?.id || null
   });
+  await setQteBadges([entry?.sourceTabId, sender?.tab?.id], "OK", "#0f766e", "PDF delivered to Quote-to-Email.");
 
-  await setActionBadge(sender?.tab?.id, "OK", "#0f766e", "PDF delivered to Quote-to-Email.");
+  return {
+    ok: true
+  };
+}
+
+async function handleQtePendingPdfFailed(message, sender) {
+  const entry = await updateQtePendingPdfs((list) => ({
+    result: list.find((item) => item.handoffId === message.handoffId) || null
+  }));
+
+  await logDiagnostic("Quote-to-Email PDF not accepted", "Quote-to-Email dashboard did not acknowledge the PDF.", {
+    handoffId: message.handoffId || "",
+    filename: message.filename || "",
+    tabId: sender?.tab?.id || null
+  });
+  await setQteBadges(
+    [entry?.sourceTabId, sender?.tab?.id],
+    "ERR",
+    "#b42318",
+    "PDF not accepted by Quote-to-Email. Reload the Quote-to-Email tab to retry.",
+    { persist: true }
+  );
 
   return {
     ok: true
@@ -3415,22 +3586,58 @@ async function handleQtePendingPdfDelivered(message, sender) {
 }
 
 async function expireQtePendingPdf() {
-  const stored = await chrome.storage.session.get(QTE_PENDING_PDF_KEY);
-  const pending = stored[QTE_PENDING_PDF_KEY];
+  const expired = await updateQtePendingPdfs((list) => {
+    const now = Date.now();
 
-  if (!pending) {
-    return;
-  }
-
-  if (!pending.expiresAtMs || Date.now() < pending.expiresAtMs) {
-    return;
-  }
-
-  await chrome.storage.session.remove(QTE_PENDING_PDF_KEY);
-  await logDiagnostic("Quote-to-Email PDF timeout", "Pending Quote-to-Email PDF handoff timed out and was discarded.", {
-    filename: pending.filename || "",
-    expiresAt: pending.expiresAt || ""
+    return {
+      next: list.filter((item) => item.expiresAtMs > now),
+      result: list.filter((item) => !(item.expiresAtMs > now))
+    };
   });
+
+  for (const entry of expired) {
+    await logDiagnostic("Quote-to-Email PDF timeout", "Pending Quote-to-Email PDF handoff timed out and was discarded.", {
+      handoffId: entry.handoffId || "",
+      filename: entry.filename || "",
+      expiresAt: entry.expiresAt || ""
+    });
+    await setQteBadges(
+      [entry.sourceTabId],
+      "ERR",
+      "#b42318",
+      "PDF expired before Quote-to-Email accepted it. Send it again.",
+      { persist: true }
+    );
+  }
+}
+
+async function handleQteTabRemoved(tabId) {
+  const removed = await updateQtePendingPdfs((list) => {
+    const kept = list.filter((item) => item.targetTabId !== tabId);
+
+    return kept.length === list.length
+      ? { result: [] }
+      : { next: kept, result: list.filter((item) => item.targetTabId === tabId) };
+  });
+
+  for (const entry of removed) {
+    await logDiagnostic("Quote-to-Email tab closed", "Quote-to-Email tab closed before the PDF was delivered.", {
+      handoffId: entry.handoffId || "",
+      filename: entry.filename || "",
+      tabId
+    });
+
+    if (Number.isInteger(entry.sourceTabId)) {
+      await clearActionBadge(entry.sourceTabId).catch(() => {});
+    }
+  }
+}
+
+async function setQteBadges(tabIds, text, color, title, options = {}) {
+  // Integers only: setActionBadge with a non-integer tab id sets the global badge.
+  for (const tabId of new Set(tabIds.filter(Number.isInteger))) {
+    await setActionBadge(tabId, text, color, title, options).catch(() => {});
+  }
 }
 
 function stripPdfDataUrlPrefix(base64 = "") {
@@ -3876,11 +4083,11 @@ function getSendSuccessMessage(sendMode, source) {
 
 function getDeliverySuccessMessage(settings, result) {
   if (result.webAppOpened && result.webhookSent) {
-    return "PDF opened in Quote-to-Email and sent to webhook.";
+    return "PDF handed to Quote-to-Email and sent to webhook.";
   }
 
   if (result.webAppOpened) {
-    return "PDF opened in Quote-to-Email.";
+    return "PDF handed to Quote-to-Email; waiting for the dashboard to accept it.";
   }
 
   if (result.webhookSent) {

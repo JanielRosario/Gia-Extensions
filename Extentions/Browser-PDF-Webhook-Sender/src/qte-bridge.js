@@ -1,119 +1,164 @@
 (() => {
-  const READY_SOURCE = "quote-to-email";
+  const APP_SOURCE = "quote-to-email";
   const READY_TYPE = "qte-intake-ready";
-  const PDF_SOURCE = "qte-extension";
+  const ACK_TYPE = "qte-intake-ack";
+  const EXTENSION_SOURCE = "qte-extension";
+  const PING_TYPE = "qte-intake-ping";
   const PDF_TYPE = "qte-intake-pdf";
-  const PENDING_KEY = "qtePendingPdf";
-  const LAST_SENT_KEY = "qteLastSentPdf";
   const DOWNLOAD_BUTTON_ID = "qte-extension-download-last-pdf";
-  const WAIT_FOR_PENDING_MS = 120000;
-  let delivered = false;
-  let delivering = false;
+  const ACK_TIMEOUT_MS = 3000;
+  const posted = new Map();
+  const delivered = new Set();
+  const failed = new Set();
+  let inFlight = null;
+  let asking = false;
 
-  chrome.storage.session.get(LAST_SENT_KEY)
-    .then((stored) => {
-      const lastSent = stored[LAST_SENT_KEY];
-
-      if (lastSent?.base64) {
-        installDownloadButton(lastSent);
-      }
-    })
-    .catch(() => {});
-
-  window.addEventListener("message", async (event) => {
+  window.addEventListener("message", (event) => {
     if (event.origin !== location.origin) {
       return;
     }
 
     const data = event.data;
 
-    if (!data || data.source !== READY_SOURCE || data.type !== READY_TYPE) {
+    if (!data || data.source !== APP_SOURCE) {
       return;
     }
 
-    await deliverPendingPdf(await waitForPendingPdf());
-  });
-
-  chrome.storage.onChanged?.addListener((changes, areaName) => {
-    if (areaName !== "session") {
-      return;
-    }
-
-    const pending = changes[PENDING_KEY]?.newValue;
-
-    if (pending?.base64) {
-      deliverPendingPdf(pending).catch(() => {});
+    if (data.type === READY_TYPE) {
+      askForPendingPdf();
+    } else if (data.type === ACK_TYPE) {
+      handleAck(data);
     }
   });
 
-  async function deliverPendingPdf(pending) {
-    if (delivered || delivering || !pending) {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "QTE_PROBE") {
+      sendResponse({ ok: true });
+    } else if (message?.type === "QTE_PING") {
+      postPing();
+      sendResponse({ ok: true });
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      postPing();
+    }
+  });
+
+  postPing();
+
+  function postPing() {
+    window.postMessage({
+      source: EXTENSION_SOURCE,
+      type: PING_TYPE
+    }, location.origin);
+  }
+
+  async function askForPendingPdf() {
+    if (asking || inFlight) {
       return;
     }
 
-    if (pending.expiresAtMs && Date.now() > pending.expiresAtMs) {
-      await chrome.storage.session.remove(PENDING_KEY);
+    asking = true;
+    const reply = await sendToWorker({
+      type: "QTE_READY",
+      exclude: [...delivered, ...failed]
+    });
+    asking = false;
+
+    const pending = reply?.pending;
+
+    if (!pending?.base64 || inFlight || delivered.has(pending.handoffId) || failed.has(pending.handoffId)) {
       return;
     }
 
-    delivering = true;
+    const handoff = {
+      handoffId: pending.handoffId,
+      filename: pending.filename || "quote.pdf",
+      base64: stripDataUrlPrefix(pending.base64),
+      metadata: pending.metadata || {}
+    };
 
+    posted.set(getFingerprint(handoff.base64), handoff);
+    inFlight = {
+      handoff,
+      timer: setTimeout(handleAckTimeout, ACK_TIMEOUT_MS),
+      retried: false
+    };
+    postPdf(handoff);
+  }
+
+  function postPdf(handoff) {
+    window.postMessage({
+      source: EXTENSION_SOURCE,
+      type: PDF_TYPE,
+      filename: handoff.filename,
+      base64: handoff.base64
+    }, location.origin);
+  }
+
+  function handleAckTimeout() {
+    const handoff = inFlight.handoff;
+
+    if (!inFlight.retried) {
+      inFlight.retried = true;
+      inFlight.timer = setTimeout(handleAckTimeout, ACK_TIMEOUT_MS);
+      postPdf(handoff);
+      return;
+    }
+
+    inFlight = null;
+    failed.add(handoff.handoffId);
+    sendToWorker({
+      type: "QTE_PENDING_PDF_FAILED",
+      handoffId: handoff.handoffId,
+      filename: handoff.filename
+    });
+  }
+
+  function handleAck(data) {
+    const handoff = posted.get(data.fingerprint);
+
+    if (!handoff || delivered.has(handoff.handoffId)) {
+      return;
+    }
+
+    delivered.add(handoff.handoffId);
+    failed.delete(handoff.handoffId);
+
+    if (inFlight?.handoff === handoff) {
+      clearTimeout(inFlight.timer);
+      inFlight = null;
+    }
+
+    installDownloadButton(handoff);
+    sendToWorker({
+      type: "QTE_PENDING_PDF_DELIVERED",
+      handoffId: handoff.handoffId,
+      filename: handoff.filename,
+      appUrl: location.href
+    });
+    askForPendingPdf();
+  }
+
+  async function sendToWorker(message) {
     try {
-      const sent = {
-        filename: pending.filename || "quote.pdf",
-        base64: stripDataUrlPrefix(pending.base64 || ""),
-        deliveredAt: new Date().toISOString(),
-        metadata: pending.metadata || {}
-      };
-
-      window.postMessage({
-        source: PDF_SOURCE,
-        type: PDF_TYPE,
-        filename: sent.filename,
-        base64: sent.base64
-      }, location.origin);
-
-      await chrome.storage.session.set({
-        [LAST_SENT_KEY]: sent
-      });
-      await chrome.storage.session.remove(PENDING_KEY);
-      installDownloadButton(sent);
-      delivered = true;
-
-      chrome.runtime.sendMessage({
-        type: "QTE_PENDING_PDF_DELIVERED",
-        filename: sent.filename,
-        appUrl: location.href
-      }).catch(() => {});
-    } finally {
-      delivering = false;
+      return await chrome.runtime.sendMessage(message);
+    } catch {
+      return null;
     }
   }
 
-  async function waitForPendingPdf() {
-    const startedAt = Date.now();
+  function getFingerprint(base64) {
+    let hash = 0x811c9dc5;
 
-    while (Date.now() - startedAt < WAIT_FOR_PENDING_MS) {
-      const stored = await chrome.storage.session.get(PENDING_KEY);
-      const pending = stored[PENDING_KEY];
-
-      if (pending?.expiresAtMs && Date.now() > pending.expiresAtMs) {
-        await chrome.storage.session.remove(PENDING_KEY);
-        return null;
-      }
-
-      if (pending?.base64) {
-        return pending;
-      }
-
-      await delay(500);
+    for (let index = 0; index < base64.length; index += 1) {
+      hash ^= base64.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
     }
 
-    return null;
-  }
-
-  function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return `${base64.length}:${(hash >>> 0).toString(16).padStart(8, "0")}`;
   }
 
   function installDownloadButton(pdf) {
