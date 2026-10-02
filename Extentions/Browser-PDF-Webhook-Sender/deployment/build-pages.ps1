@@ -78,6 +78,7 @@ $packageSlug = "browser-pdf-webhook-sender"
 $pagesBase = $PagesBaseUrl.TrimEnd("/")
 $relativeDir = "Extentions/Browser-PDF-Webhook-Sender"
 $relativeCrxPath = "$relativeDir/$packageSlug-$version.crx"
+$unpackedZipName = "$packageSlug-$version-unpacked.zip"
 $updateUrl = "$pagesBase/$relativeDir/update.xml"
 $installerPs1Url = "$pagesBase/$relativeDir/install-managed-extension.ps1"
 $crxUrl = "$pagesBase/$relativeCrxPath"
@@ -150,6 +151,7 @@ try {
   $publishDir = Join-Path $resolvedOutputDir $relativeDir
   New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
   Copy-Item -LiteralPath $packedCrx -Destination (Join-Path $publishDir "$packageSlug-$version.crx") -Force
+  Compress-Archive -Path $stagingDir -DestinationPath (Join-Path $publishDir $unpackedZipName) -Force
 
   $escapedCrxUrl = [Security.SecurityElement]::Escape($crxUrl)
   $escapedExtensionId = [Security.SecurityElement]::Escape($extensionId)
@@ -272,10 +274,18 @@ pause
       </section>
 
       <section>
+        <h2>Manual Developer Install</h2>
+        <p>Download this ZIP, extract it, then use <strong>Load unpacked</strong> in <code>chrome://extensions</code> or <code>edge://extensions</code> and select the extracted <code>Browser-PDF-Webhook-Sender</code> folder.</p>
+        <p><a class="button" href="./$unpackedZipName">Download unpacked ZIP</a></p>
+        <p class="muted">This manual install does not auto-update. Download a fresh ZIP when a new version is published.</p>
+      </section>
+
+      <section>
         <h2>Files</h2>
         <ul>
           <li><a href="./update.xml">update.xml</a></li>
           <li><a href="./$packageSlug-$version.crx">$packageSlug-$version.crx</a></li>
+          <li><a href="./$unpackedZipName">$unpackedZipName</a></li>
           <li><a href="./install-managed-extension.ps1">install-managed-extension.ps1</a></li>
           <li><a href="./install-managed-extension.bat">install-managed-extension.bat</a></li>
         </ul>
