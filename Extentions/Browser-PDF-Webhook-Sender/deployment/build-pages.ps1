@@ -150,6 +150,7 @@ try {
 
   $publishDir = Join-Path $resolvedOutputDir $relativeDir
   New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
+  Copy-Item -LiteralPath (Join-Path $resolvedExtensionDir "privacy.html") -Destination (Join-Path $publishDir "privacy.html") -Force
   Copy-Item -LiteralPath $packedCrx -Destination (Join-Path $publishDir "$packageSlug-$version.crx") -Force
   Compress-Archive -Path $stagingDir -DestinationPath (Join-Path $publishDir $unpackedZipName) -Force
 
@@ -259,6 +260,7 @@ pause
     <main>
       <h1>Browser PDF Webhook Sender</h1>
       <p class="muted">Version $version &middot; Extension ID <code>$extensionId</code></p>
+      <p><a href="./privacy.html">Chrome Web Store privacy policy</a></p>
 
       <section>
         <h2>Install or Update</h2>

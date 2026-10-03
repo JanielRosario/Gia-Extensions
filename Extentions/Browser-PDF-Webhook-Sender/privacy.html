@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UGomez - Browser PDF Webhook Sender Privacy Policy</title>
+  <style>
+    body { margin: 0; background: #fff; color: #202124; font: 16px/1.6 Arial, sans-serif; }
+    main { max-width: 800px; margin: 48px auto; padding: 0 24px; }
+    h1 { font-size: 28px; line-height: 1.2; }
+    h2 { font-size: 20px; margin-top: 32px; }
+    a { color: #155e75; }
+    li { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Browser PDF Webhook Sender Privacy Policy</h1>
+  <p>Publisher: UGomez<br>Effective date: October 2, 2026<br>Contact: <a href="mailto:Janiel@gomezagency.net">Janiel@gomezagency.net</a></p>
+  <h2>Purpose</h2>
+  <p>This policy describes the Chrome Web Store build of Browser PDF Webhook Sender, version 0.25.37. The extension supports UGomez's internal quote-document workflow. It captures readable PDFs from browser tabs and supported quote pages and delivers them to Quote-to-Email or a configured HTTPS webhook when the user initiates a send action. It has no billing integration or payment-collection feature.</p>
+  <h2>Information the extension handles</h2>
+  <ul>
+    <li>PDF document contents and filenames. Documents can contain personal, insurance or other confidential information depending on the files the user opens. The extension does not collect payment details through payment forms or payment systems, and it does not filter or redact the contents of the PDFs it forwards.</li>
+    <li>Relevant source-page URLs, page titles, PDF URLs, capture timestamps and delivery metadata. JSON webhook mode also includes the browser's user-agent string.</li>
+    <li>Delivery preferences, webhook and configuration URLs, optional configuration authentication tokens, and cached administrator JSON settings.</li>
+    <li>Temporary PDF request bodies and headers needed to replay authenticated Farmers PolicyCenter document requests using the existing site session.</li>
+    <li>Local diagnostic events used to investigate PDF capture and delivery problems. Some events include relevant document/page metadata.</li>
+  </ul>
+  <h2>Background capture and manual delivery</h2>
+  <p>The extension can detect and cache PDFs before the user sends them. On supported quote pages it observes document triggers and relevant requests, and it can detect readable PDF downloads. PDF detection alone does not upload a document to Quote-to-Email or the webhook.</p>
+  <p>The toolbar button and extension send controls initiate document delivery. Depending on the chosen mode, the extension hands the PDF to the signed-in Quote-to-Email dashboard, posts it to the configured webhook, or does both.</p>
+  <h2>Storage</h2>
+  <p>PDF bodies are cached locally in the extension's IndexedDB database. PDF metadata and diagnostics use local extension storage. Cached PDFs can be replaced by subsequent captures and cleared through the extension's controls; tab-specific caches are cleared when the source tab closes. This is not a promise that all local records expire at a fixed time.</p>
+  <p>Delivery settings, optional administrator configuration and the optional configuration bearer token use Chrome sync storage. When browser synchronization is enabled, Google may synchronize those settings according to the user's Chrome settings. Pending Quote-to-Email handoffs use session storage and are removed after the dashboard acknowledges delivery, after 15 minutes if not delivered, or when their target tab closes. The extension's dashboard bridge also holds document data in page memory to support downloading a sent PDF; this memory is cleared when the page unloads.</p>
+  <p>Temporary authenticated PDF replay information is held in service-worker memory for the capture workflow. Removing the extension removes its local extension storage; recipient services may retain documents already delivered to them.</p>
+  <h2>Destinations and sharing</h2>
+  <p>Quote-to-Email delivery hands the PDF to <a href="https://quote-to-email.giatools.com/dashboard">quote-to-email.giatools.com</a>. Webhook delivery sends PDF contents and relevant metadata to the endpoint in the effective configuration. Optional administrator configuration can override the destination and delivery mode.</p>
+  <p>If remote configuration is enabled, the extension requests JSON from the configured HTTPS server before sending and periodically, normally every 30 minutes. An optional bearer token is included in requests to that server. Remote configuration is treated as data; the extension does not execute JavaScript received from it.</p>
+  <p>The extension package contains no advertising or analytics integration. Data is still transferred to the selected document destination, the configuration server when enabled, and Chrome's synchronization service when applicable.</p>
+  <h2>Recipient service practices</h2>
+  <p>In UGomez's intended Quote-to-Email workflow, the PDF is made available to the person currently using the extension, is temporarily cached, can be downloaded, and is automatically cleared from the cache. This policy does not promise a fixed cache lifetime for the receiving application. The 15-minute limit above applies to the extension's undelivered handoff queue, not all copies held by the application.</p>
+  <p>A downloaded PDF is a separate file controlled by the user. Automatically clearing a cache does not delete downloaded copies. A separately configured webhook is controlled by its operator and may retain delivered documents according to that operator's practices. Contact UGomez for assistance with the internal workflow, or the relevant operator for a separate webhook.</p>
+  <h2>Security and user choices</h2>
+  <p>This store build requires HTTPS webhook and remote-configuration URLs and rejects HTTP destinations. Users can change delivery settings, clear cached PDFs through the extension controls, disable optional administrator configuration by removing its URL, disable or uninstall the extension, and choose whether Chrome permits access to local file URLs.</p>
+  <p>Broad host access supports PDFs from arbitrary websites and user-configured destinations. Automatically declared content scripts are limited to the supported Farmers PolicyCenter, Aegis and Quote-to-Email hosts. Users should send only documents they are authorized to share.</p>
+  <h2>Limited use of data</h2>
+  <p>UGomez's use of data handled by this extension complies with the <a href="https://developer.chrome.com/docs/webstore/program-policies/policies#protecting_user_privacy">Chrome Web Store User Data Policy</a>, including its Limited Use requirements. User data is used to provide or improve the disclosed PDF capture and delivery workflow, including related security and reliability operations.</p>
+  <p>UGomez does not sell or transfer user data outside the approved Limited Use cases, does not use or transfer user data for purposes unrelated to the extension's single purpose, and does not use or transfer user data to determine creditworthiness or for lending purposes. User data is not used for personalized, retargeted or interest-based advertising, or transferred to advertising platforms, data brokers or information resellers.</p>
+  <p>The PDF is made available to the user for the requested workflow. UGomez does not otherwise allow people to read user data except with the user's explicit consent for specific data, when necessary for security or legal compliance, or when data is aggregated and anonymized for internal operations as permitted by the Limited Use requirements.</p>
+  <h2>Requests and contact</h2>
+  <p>For privacy questions, correction or deletion requests, contact UGomez at <a href="mailto:Janiel@gomezagency.net">Janiel@gomezagency.net</a>. Requests concerning documents already sent to a separate webhook operator may also need to be directed to that operator.</p>
+</main>
+</body>
+</html>
