@@ -287,7 +287,7 @@
   <header>
     <div class="wrap">
       <h1>Tampermonkey Installers</h1>
-      <p class="subhead">Choose your position and install the approved updater scripts for your workstation.</p>
+      <p class="subhead">Choose your position and install the approved Tampermonkey scripts for your workstation.</p>
     </div>
   </header>
 
@@ -300,6 +300,13 @@
       </div>
     </div>
 
+    <article class="script" id="tampermonkey-extension" style="min-height: 0; margin-bottom: 14px;">
+      <h2>Tampermonkey — Chrome Extension</h2>
+      <p class="description">Install Tampermonkey first, then install the updater scripts below.</p>
+      <div class="card-actions">
+        <a class="button install" href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer">Install from Chrome Web Store</a>
+      </div>
+    </article>
     <section class="position-panel">
       <p class="position-title">Select position</p>
       <div class="position-buttons" id="positionButtons"></div>
@@ -395,33 +402,32 @@
     }
 
     async function loadScript(configScript) {
-      const updaterSource = await fetchText(`${rawUrl(configScript.path)}?installer=${Date.now()}`);
-      const targetPath = targetPathFromUpdater(configScript.path, updaterSource);
-      let scriptVersion = 'unknown';
-      let scriptName = '';
-      let scriptDescription = '';
+      const installerSource = await fetchText(`${rawUrl(configScript.path)}?installer=${Date.now()}`);
+      const targetPath = targetPathFromUpdater(configScript.path, installerSource);
+      const isDirectScript = !targetPath;
+      const targetSource = isDirectScript
+        ? installerSource
+        : await fetchText(`${rawUrl(targetPath)}?script=${Date.now()}`);
 
-      if (targetPath) {
-        const targetSource = await fetchText(`${rawUrl(targetPath)}?script=${Date.now()}`);
-        scriptVersion = readMeta(targetSource, 'version') || 'unknown';
-        scriptName = readMeta(targetSource, 'name');
-        scriptDescription = readMeta(targetSource, 'description');
-      }
+      const scriptVersion = readMeta(targetSource, 'version') || 'unknown';
+      const scriptName = readMeta(targetSource, 'name');
+      const scriptDescription = readMeta(targetSource, 'description');
 
-      const updaterName = readMeta(updaterSource, 'name') || configScript.path.split('/').pop();
-      const displayName = scriptName || updaterName.replace(/\s+Updater$/i, '');
+      const installerName = readMeta(installerSource, 'name') || configScript.path.split('/').pop();
+      const displayName = scriptName || installerName.replace(/\s+Updater$/i, '');
 
       return {
         path: configScript.path,
-        installUrl: readMeta(updaterSource, 'downloadURL') || readMeta(updaterSource, 'updateURL') || rawUrl(configScript.path),
+        installUrl: readMeta(installerSource, 'downloadURL') || readMeta(installerSource, 'updateURL') || rawUrl(configScript.path),
         name: displayName,
-        updaterName,
-        updaterVersion: readMeta(updaterSource, 'version') || 'unknown',
+        installerName,
+        installerVersion: readMeta(installerSource, 'version') || 'unknown',
         scriptVersion,
-        description: configScript.summary || scriptDescription || readMeta(updaterSource, 'description') || 'Tampermonkey updater script.',
-        details: configScript.details || scriptDescription || readMeta(updaterSource, 'description') || '',
-        matches: readMatches(updaterSource),
-        targetPath,
+        description: configScript.summary || scriptDescription || readMeta(installerSource, 'description') || 'Tampermonkey script.',
+        details: configScript.details || scriptDescription || readMeta(installerSource, 'description') || '',
+        matches: readMatches(targetSource),
+        targetPath: targetPath || configScript.path,
+        installType: isDirectScript ? 'Direct script' : 'Updater',
         positions: configScript.positions || [],
         tags: Array.isArray(configScript.tags) ? configScript.tags.map(clean).filter(Boolean) : []
       };
@@ -473,7 +479,7 @@
 
       if (!state.position) {
         renderEmpty('Choose your position to show installers.');
-        setStatus(`Loaded ${state.scripts.length} configured updaters.`);
+        setStatus(`Loaded ${state.scripts.length} configured installers.`);
         return;
       }
 
@@ -492,14 +498,16 @@
           <p class="description">${script.description}</p>
           ${renderTags(script.tags)}
           <dl>
-            <dt>Updater version</dt>
-            <dd>${script.updaterVersion}</dd>
+            <dt>Install type</dt>
+            <dd>${script.installType}</dd>
+            <dt>Installer version</dt>
+            <dd>${script.installerVersion}</dd>
             <dt>Script version</dt>
             <dd>${script.scriptVersion}</dd>
-            <dt>Updater path</dt>
+            <dt>Installer path</dt>
             <dd><code>${script.path}</code></dd>
             <dt>Script path</dt>
-            <dd><code>${script.targetPath || 'Not found'}</code></dd>
+            <dd><code>${script.targetPath}</code></dd>
             <dt>Runs on</dt>
             <dd>${script.matches.length ? script.matches.join(', ') : 'Not specified'}</dd>
           </dl>

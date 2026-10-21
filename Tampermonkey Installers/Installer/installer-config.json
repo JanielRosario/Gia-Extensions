@@ -1,10 +1,12 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-06-05",
+  "updatedAt": "2026-10-21",
   "positions": [
     "PRODUCER",
     "CSR",
-    "SDR"
+    "SDR",
+    "Admins",
+    "ALL"
   ],
   "tags": [
     "Ulises Gomez",
@@ -12,27 +14,29 @@
   ],
   "scripts": [
     {
-      "path": "ALTA/Reconstruction Button/alta-reconstruction-button-updater.user.js",
+      "path": "General Utilities/Mileage Calculator/policycenter-mileage-calculator-updater.user.js",
       "positions": [
-        "PRODUCER",
-        "CSR"
+        "ALL"
       ],
       "tags": [],
-      "summary": "Adds the Reconstruction Calculator link to ALTA home features.",
-      "details": "Adds an ALTA-style Reconstruction Calculator link beside the existing property lookup links and opens the calculator with ZIP code and livable square feet from the quote."
+      "summary": "Calculates annual mileage and fills the chosen PolicyCenter vehicle's Annual Miles field.",
+      "details": "Adds the hosted, draggable Mileage Calculator beside Annual Miles, including one button per vehicle on Auto Data Prefill. Copy miles fills the field beside the button that opened it. Updates are cached for the next page load. Future Google Sheets network permissions are declared; no sheet is connected. Assign positions in the Installer manager when ready for staff rollout."
     },
     {
       "path": "AgencyZoom/Hidden Tag Manager/agencyzoom-hidden-tag-manager-updater.user.js",
-      "positions": [],
+      "positions": [
+        "ALL"
+      ],
       "tags": [],
       "summary": "Manager tool for selecting AgencyZoom tags hidden from producer views.",
-      "details": "Use this on manager workstations to maintain the hidden-tag list for AgencyZoom cards. It has no employee position assignment and will not show on the public installer page unless assigned to PRODUCER, CSR, or SDR."
+      "details": "Use this on manager workstations to maintain the hidden-tag list for AgencyZoom cards. It has no employee position assignment and will not show on the public installer page unless assigned to PRODUCER, CSR, SDR, or Admins."
     },
     {
       "path": "AgencyZoom/Location Box Cleanup/agencyzoom-cleanup-force-usa-country-updater.user.js",
       "positions": [
         "PRODUCER",
-        "CSR"
+        "CSR",
+        "ALL"
       ],
       "tags": [],
       "summary": "Cleans AgencyZoom location fields and forces USA in country dropdowns.",
@@ -42,30 +46,53 @@
       "path": "AgencyZoom/Pipeline Click-to-Call/agencyzoom-pipeline-click-to-call-updater.user.js",
       "positions": [
         "PRODUCER",
-        "CSR"
+        "CSR",
+        "ALL"
       ],
       "tags": [],
       "summary": "Adds call, SMS, email, and note actions to AgencyZoom pipeline views.",
       "details": "Adds AgencyZoom-style action icons to lead pipeline cards and task modals. Phone calls route through RingCentral; notes, SMS, and email actions open the matching AgencyZoom workflows."
     },
     {
+      "path": "AgencyZoom/Google Review Helper/ulises-google-review-helper-updater.user.js",
+      "positions": [
+        "PRODUCER",
+        "CSR",
+        "ALL"
+      ],
+      "tags": [
+        "Ulises Gomez"
+      ],
+      "summary": "Shows Google review status on AgencyZoom SMS conversations.",
+      "details": "Checks the open AgencyZoom SMS client name against Ulises Gomez Agency Google reviews, shows whether a review was found, and drafts either the review request or thank-you SMS."
+    },
+    {
       "path": "AgencyZoom/Producer Tag Hider/agencyzoom-producer-tag-hider-updater.user.js",
       "positions": [
-        "PRODUCER"
+        "PRODUCER",
+        "ALL"
       ],
       "tags": [],
       "summary": "Hides manager-selected AgencyZoom card tags from producer views.",
       "details": "Runs on producer machines. It reads the manager-selected hidden-tag list, caches it locally, and hides matching AgencyZoom card tags as cards render."
     },
     {
+      "path": "JR/AZ-LEX-LocalBus/AZ-LEX-LocalBus-updater.user.js",
+      "positions": [
+        "CSR"
+      ],
+      "tags": [],
+      "summary": "Runs the AgencyZoom to Farmers LEX renewal bus.",
+      "details": "Loads and auto-updates the AZ-LEX Bus script for AgencyZoom and Farmers LEX tabs, keeping the local policy lookup and premium-copy workflow current from GitHub."
+    },
+    {
       "path": "General Utilities/CFP Quick Quote PDF/cfp-quick-quote-pdf-updater.user.js",
       "positions": [
         "PRODUCER",
-        "CSR"
+        "CSR",
+        "ALL"
       ],
-      "tags": [
-        "Ulises Gomez"
-      ],
+      "tags": [],
       "summary": "Generates a downloadable PDF from the CFP quick quote platform.",
       "details": "Adds a PDF generation workflow to the CFP quick quote platform so staff can produce a downloadable quote document from the quote screen."
     },
@@ -73,7 +100,8 @@
       "path": "General Utilities/CFP Quick Quote PDF CPAGY/cfp-quick-quote-pdf-cpagy-updater.user.js",
       "positions": [
         "PRODUCER",
-        "CSR"
+        "CSR",
+        "ALL"
       ],
       "tags": [
         "Carlos Perez"
@@ -85,7 +113,7 @@
       "path": "PolicyCenter/Property Tools/gwpc-property-tools-updater.user.js",
       "positions": [
         "CSR",
-        "PRODUCER"
+        "ALL"
       ],
       "tags": [],
       "summary": "Adds property helper buttons to PolicyCenter.",
@@ -94,20 +122,67 @@
     {
       "path": "Ricochet/Pickup & Hangup Counters/ricochet-pickup-hangup-counters-updater.user.js",
       "positions": [
-        "SDR"
+        "SDR",
+        "ALL"
       ],
       "tags": [],
       "summary": "Adds pickup and hangup counters to Ricochet.",
       "details": "Adds daily Pick Ups and Hang Ups counters to Ricochet and can send the count/report payload to the configured webhook."
     },
     {
+      "path": "Admins/Spam Guru Risk Ratings/ricochet-spam-guru-risk-ratings-updater.user.js",
+      "positions": [
+        "Admins"
+      ],
+      "tags": [],
+      "summary": "Reveals actual Hiya and TNS risk ratings on the Ricochet Spam Guru page.",
+      "details": "Adds a small Spam Guru toggle that visually replaces RMD labels with the actual Hiya and TNS risk labels from the page's loaded data, without changing Remediate."
+    },
+    {
       "path": "Ricochet/Voicemail Lead Watcher/ricochet-voicemail-lead-watcher-updater.user.js",
       "positions": [
-        "SDR"
+        "SDR",
+        "ALL"
       ],
       "tags": [],
       "summary": "Reminds Ricochet SDRs when a lead needs voicemail handling.",
       "details": "Watches Ricochet lead activity and reminds SDRs when it is time to leave a voicemail, helping keep follow-up timing consistent."
+    },
+    {
+      "path": "ALTA/Reconstruction Button/alta-reconstruction-button-updater.user.js",
+      "positions": [
+        "ALL"
+      ],
+      "tags": [],
+      "summary": "Loads and auto-updates the ALTA Reconstruction Calculator Button script from GitHub.",
+      "details": "Loads and auto-updates the ALTA Reconstruction Calculator Button script from GitHub."
+    },
+    {
+      "path": "AgencyZoom/Service Category Hover Notes/agencyzoom-service-category-hover-notes-updater.user.js",
+      "positions": [
+        "ALL"
+      ],
+      "tags": [],
+      "summary": "Loads and auto-updates only the AgencyZoom Service Category Hover Notes script from GitHub.",
+      "details": "Loads and auto-updates only the AgencyZoom Service Category Hover Notes script from GitHub."
+    },
+    {
+      "path": "General Utilities/CFP Quote Summary PDF/cfp-quote-summary-pdf-updater.user.js",
+      "positions": [
+        "ALL"
+      ],
+      "tags": [],
+      "summary": "Loads and auto-updates the CFP Quote Summary PDF script from GitHub.",
+      "details": "Loads and auto-updates the CFP Quote Summary PDF script from GitHub."
+    },
+    {
+      "path": "Ricochet/Call Script/ricochet-sdr-sync-updater.user.js",
+      "positions": [
+        "ALL"
+      ],
+      "tags": [],
+      "summary": "Loads and auto-updates only the Ricochet SDR Transfer Script Sync script from GitHub.",
+      "details": "Loads and auto-updates only the Ricochet SDR Transfer Script Sync script from GitHub."
     }
   ],
   "excludedMainScripts": [
